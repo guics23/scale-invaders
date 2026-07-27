@@ -99,6 +99,20 @@
   }
   .staff-strip{ margin:18px auto 6px; }
 
+  .tonality-toggle{
+    display:inline-flex; margin:16px auto 0; gap:4px;
+    background:var(--bg-panel); border:1px solid rgba(139,127,192,.4);
+    border-radius:999px; padding:4px;
+  }
+  .ton-btn{
+    font-family:var(--font-body); font-weight:700; font-size:13px;
+    color:var(--text-dim); background:transparent;
+    border:none; border-radius:999px; padding:8px 18px;
+    transition:background .12s ease, color .12s ease;
+  }
+  .ton-btn.active{ background:var(--gold); color:#1b1330; }
+  .ton-btn:not(.active):hover{ color:var(--cream); }
+
   .cheat-sheet{
     display:flex; flex-wrap:wrap; gap:8px; justify-content:center;
     max-width:640px; margin:14px 0 6px;
@@ -354,6 +368,11 @@
       <p>Blast the right note out of the sky before it lands. Every question names a key and an interval — you find the note.</p>
     </div>
 
+    <div class="tonality-toggle" id="tonalityToggle" role="group" aria-label="Key tonality">
+      <button class="ton-btn active" data-ton="major">Major keys</button>
+      <button class="ton-btn" data-ton="minor">Minor keys</button>
+    </div>
+
     <canvas id="staffPreview" class="staff-strip" width="360" height="80"></canvas>
 
     <div class="cheat-sheet" id="cheatSheet"></div>
@@ -361,7 +380,7 @@
     <div class="mode-cards">
       <div class="mode-card">
         <h3>🚀 Arcade Mode</h3>
-        <p>Start with easy keys (C, F, G) and simple intervals. New keys and intervals unlock as your score climbs, and the notes fall faster.</p>
+        <p>Start with the simplest keys and intervals. New keys and intervals unlock as your score climbs, and the notes fall faster.</p>
         <button class="pill-btn" id="startArcadeBtn">Play Arcade</button>
       </div>
       <div class="mode-card">
@@ -380,7 +399,7 @@
 
     <p class="instructions">
       <b>◀ ▶ / A D</b> to move your ship &nbsp;·&nbsp; <b>Space / Tap</b> to fire &nbsp;·&nbsp;
-      Shoot the correct note before it reaches the bottom. Wrong shots cost a life — so does letting the right note fall past you.
+      Shoot the correct note before it reaches the bottom. Wrong shots cost points and break your streak; letting the right note fall past you costs a life.
     </p>
   </div>
 
@@ -508,6 +527,30 @@
     return ((s % 12) + 12) % 12;
   }
 
+  // Name an interval from (tonic, targetNote): generic size from letter distance,
+  // quality from semitone distance. Works for any key and either mode.
+  const PERFECT_SEMI = {1:0, 4:5, 5:7, 8:12};
+  const MAJOR_SEMI   = {2:2, 3:4, 6:9, 7:11};
+  function intervalName(tonic, note){
+    const gen = ((LETTER_INDEX[note[0]] - LETTER_INDEX[tonic[0]]) % 7 + 7) % 7 + 1;
+    const semis = ((noteSemitone(note) - noteSemitone(tonic)) % 12 + 12) % 12;
+    const ord = ordinal(gen);
+    if(gen === 1) return semis === 0 ? "Unison" : "Augmented Unison";
+    if(PERFECT_SEMI[gen] !== undefined){
+      const diff = semis - PERFECT_SEMI[gen];
+      if(diff === 0)  return "Perfect " + ord;
+      if(diff === -1) return "Diminished " + ord;
+      if(diff === 1 || diff === -11) return "Augmented " + ord;
+    } else {
+      const diff = semis - MAJOR_SEMI[gen];
+      if(diff === 0)  return "Major " + ord;
+      if(diff === -1) return "Minor " + ord;
+      if(diff === -2) return "Diminished " + ord;
+      if(diff === 1 || diff === -11) return "Augmented " + ord;
+    }
+    return ord;
+  }
+
   // Build ascending scale (from tonic) with octave numbers so we can compute real pitch.
   function buildScaleOctaves(scaleNotes){
     let octave = 4;
@@ -522,12 +565,32 @@
   const SCALE_OCTAVES = {};
   KEY_ORDER.forEach(k => { SCALE_OCTAVES[k] = buildScaleOctaves(KEYS[k]); });
 
+  /* ---- Natural minor keys, derived from the majors ----
+     A natural minor scale is its relative major rotated to start on degree 6,
+     and it shares the relative major's key signature. */
+  const MINOR_KEYS = {}, MINOR_ORDER = [], MINOR_SIG = {}, MINOR_OCTAVES = {}, REL_MINOR = {};
+  KEY_ORDER.forEach(k => {
+    const tonic = KEYS[k][5];                                   // relative minor tonic (6th degree)
+    const scale = KEYS[k].slice(5).concat(KEYS[k].slice(0,5));  // natural minor scale
+    MINOR_KEYS[tonic] = scale;
+    MINOR_ORDER.push(tonic);
+    MINOR_SIG[tonic] = KEY_SIG[k];
+    MINOR_OCTAVES[tonic] = buildScaleOctaves(scale);
+    REL_MINOR[k] = tonic;                                       // major key -> its relative minor
+  });
+
+  // Active-tonality accessors (state.tonality is "major" | "minor").
+  function activeOrder(){ return state.tonality === "minor" ? MINOR_ORDER : KEY_ORDER; }
+  function scaleFor(key){ return (state.tonality === "minor" ? MINOR_KEYS : KEYS)[key]; }
+  function octavesFor(key){ return (state.tonality === "minor" ? MINOR_OCTAVES : SCALE_OCTAVES)[key]; }
+  function sigFor(key){ return (state.tonality === "minor" ? MINOR_SIG : KEY_SIG)[key]; }
+
   function noteFrequency(note, octave){
     const midi = (octave + 1) * 12 + noteSemitone(note);
     return 440 * Math.pow(2, (midi - 69) / 12);
   }
 
-  function keyDisplayName(k){ return k + " Major"; }
+  function keyDisplayName(k){ return k + (state.tonality === "minor" ? " Minor" : " Major"); }
 
   /* =========================================================
      LEVEL PROGRESSION (arcade mode)
@@ -586,6 +649,7 @@
      ========================================================= */
   const state = {
     mode: "arcade",           // "arcade" | "practice"
+    tonality: "major",        // "major" | "minor" (global toggle)
     practiceKeys: KEY_ORDER.slice(),
     score: 0, streak: 0, bestStreak: 0, lives: 3, level: 0,
     activeKey: null, keyRounds: 0, keyLockTarget: 10, lastIvIdx: null,  // stay in one key for a randomized run
@@ -625,23 +689,27 @@
     scaleModalKey: document.getElementById("scaleModalKey"),
     scaleModalIv: document.getElementById("scaleModalIv"),
     keyGrid: document.getElementById("keyGrid"),
-    cheatSheet: document.getElementById("cheatSheet")
+    cheatSheet: document.getElementById("cheatSheet"),
+    tonalityToggle: document.getElementById("tonalityToggle")
   };
   const ctx = el.canvas.getContext("2d");
 
   /* =========================================================
      START SCREEN: build key grid + cheat sheet + preview staff
      ========================================================= */
-  KEY_ORDER.forEach(k => {
-    const chip = document.createElement("div");
-    chip.className = "chip active";
-    chip.textContent = keyDisplayName(k).replace(" Major","");
-    chip.dataset.key = k;
-    chip.tabIndex = 0;
-    chip.addEventListener("click", () => toggleKeyChip(chip, k));
-    chip.addEventListener("keydown", (e) => { if(e.key==="Enter"||e.key===" "){ e.preventDefault(); toggleKeyChip(chip,k);} });
-    el.keyGrid.appendChild(chip);
-  });
+  function buildKeyGrid(){
+    el.keyGrid.innerHTML = "";
+    activeOrder().forEach(k => {
+      const chip = document.createElement("div");
+      chip.className = "chip" + (state.practiceKeys.includes(k) ? " active" : "");
+      chip.textContent = k;                 // tonic letter (mode is shown by the toggle)
+      chip.dataset.key = k;
+      chip.tabIndex = 0;
+      chip.addEventListener("click", () => toggleKeyChip(chip, k));
+      chip.addEventListener("keydown", (e) => { if(e.key==="Enter"||e.key===" "){ e.preventDefault(); toggleKeyChip(chip,k);} });
+      el.keyGrid.appendChild(chip);
+    });
+  }
   function toggleKeyChip(chip, k){
     chip.classList.toggle("active");
     if(chip.classList.contains("active")){
@@ -651,7 +719,7 @@
     }
   }
   document.getElementById("selectAllKeys").addEventListener("click", () => {
-    state.practiceKeys = KEY_ORDER.slice();
+    state.practiceKeys = activeOrder().slice();
     el.keyGrid.querySelectorAll(".chip").forEach(c => c.classList.add("active"));
   });
   document.getElementById("selectNoneKeys").addEventListener("click", () => {
@@ -659,16 +727,41 @@
     el.keyGrid.querySelectorAll(".chip").forEach(c => c.classList.remove("active"));
   });
 
-  INTERVALS.forEach(iv => {
-    const span = document.createElement("span");
-    span.innerHTML = "<b>" + iv.deg + "</b>" + iv.name.replace(/^(Major|Perfect) /,"");
-    el.cheatSheet.appendChild(span);
-  });
+  // Cheat sheet reflects the current tonality's interval qualities.
+  function buildCheatSheet(){
+    el.cheatSheet.innerHTML = "";
+    const refKey = activeOrder()[0];
+    const refScale = scaleFor(refKey);
+    INTERVALS.forEach(iv => {
+      const nm = intervalName(refKey, refScale[iv.deg-1])
+        .replace("Major","Maj").replace("Minor","min").replace("Perfect","Perf");
+      const span = document.createElement("span");
+      span.innerHTML = "<b>" + iv.deg + "</b>" + nm;
+      el.cheatSheet.appendChild(span);
+    });
+  }
+  buildKeyGrid();
+  buildCheatSheet();
+
+  // Global Major/Minor toggle (rebuilds the practice grid, cheat sheet, and preview).
+  function setTonality(t){
+    if(t === state.tonality) return;
+    state.tonality = t;
+    state.practiceKeys = activeOrder().slice();   // select all keys of the new tonality
+    previewKeyIdx = 0;
+    buildKeyGrid();
+    buildCheatSheet();
+    drawPreview();
+    el.tonalityToggle.querySelectorAll(".ton-btn").forEach(b =>
+      b.classList.toggle("active", b.dataset.ton === t));
+  }
+  el.tonalityToggle.querySelectorAll(".ton-btn").forEach(b =>
+    b.addEventListener("click", () => setTonality(b.dataset.ton)));
 
   /* =========================================================
      STAFF DRAWING (used both in the mini preview and in-game)
      ========================================================= */
-  function drawStaff(g, x0, topY, width, keyName, lineSpacing){
+  function drawStaff(g, x0, topY, width, sig, lineSpacing){
     const ls = lineSpacing;
     const half = ls/2;
     g.strokeStyle = "rgba(139,127,192,0.85)";
@@ -686,8 +779,7 @@
     g.textBaseline = "alphabetic";
     g.fillText("\uD834\uDD1E", x0 - ls*0.3, topY + ls*4 + ls*1.1);
 
-    // key signature
-    const sig = KEY_SIG[keyName];
+    // key signature (sig = {type, count})
     let sx = x0 + ls*3.4;
     if(sig && sig.count > 0){
       const order = sig.type === "sharp" ? SHARP_ORDER : FLAT_ORDER;
@@ -712,11 +804,12 @@
   let previewKeyIdx = 0;
   function drawPreview(){
     previewCtx.clearRect(0,0,previewCanvas.width, previewCanvas.height);
-    drawStaff(previewCtx, 46, 24, 280, KEY_ORDER[previewKeyIdx], 11);
+    const order = activeOrder();
+    drawStaff(previewCtx, 46, 24, 280, sigFor(order[previewKeyIdx % order.length]), 11);
   }
   drawPreview();
   setInterval(() => {
-    previewKeyIdx = (previewKeyIdx + 1) % KEY_ORDER.length;
+    previewKeyIdx = (previewKeyIdx + 1) % activeOrder().length;
     drawPreview();
   }, 1800);
 
@@ -752,11 +845,13 @@
      ========================================================= */
   function currentPool(){
     if(state.mode === "practice"){
-      const keys = state.practiceKeys.length ? state.practiceKeys : ["C"];
+      const keys = state.practiceKeys.length ? state.practiceKeys : [activeOrder()[0]];
       return {keys, intervalIdx:[0,1,2,3,4,5], objects:4, speed:58};
     }
     const lvl = LEVELS[state.level];
-    return {keys:lvl.keys, intervalIdx:lvl.intervals, objects:lvl.objects, speed:lvl.speed};
+    // level pools are defined by major key; map to relative minor when in minor mode
+    const keys = state.tonality === "minor" ? lvl.keys.map(k => REL_MINOR[k]) : lvl.keys;
+    return {keys, intervalIdx:lvl.intervals, objects:lvl.objects, speed:lvl.speed};
   }
 
   function shuffle(arr){
@@ -803,12 +898,14 @@
     }
     const ivIdx = ivChoices[Math.floor(Math.random()*ivChoices.length)];
     state.lastIvIdx = ivIdx;
-    const interval = INTERVALS[ivIdx];
-    const scale = KEYS[key];
-    const scaleOct = SCALE_OCTAVES[key];
-    const correctIndex = interval.deg - 1;
+    const deg = INTERVALS[ivIdx].deg;
+    const scale = scaleFor(key);
+    const scaleOct = octavesFor(key);
+    const correctIndex = deg - 1;
     const correctNote = scale[correctIndex];
     const correctOctave = scaleOct[correctIndex].octave;
+    // interval name is derived from the actual notes, so it's correct in either mode
+    const interval = {deg, name: intervalName(key, correctNote)};
 
     state.current = {key, interval, correctNote, correctOctave, correctIndex};
 
@@ -899,7 +996,7 @@
     state.streak += 1;
     state.bestStreak = Math.max(state.bestStreak, state.streak);
     if(state.mode === "arcade") state.level = levelForScore(state.score);
-    const tonic = SCALE_OCTAVES[state.current.key][0];
+    const tonic = octavesFor(state.current.key)[0];
     playCorrect(obj.note, obj.octave, tonic.note, tonic.octave);
     spawnParticles(obj.x, obj.y, "#eab54c", 18);
     showFeedback(obj.note + " ✓  " + state.current.interval.name, true);
@@ -1099,7 +1196,7 @@
 
     // staff
     if(state.current){
-      drawStaff(ctx, 66, 18, W-110, state.current.key, 10);
+      drawStaff(ctx, 66, 18, W-110, sigFor(state.current.key), 10);
     }
 
     // persistent target-degree aid, centered behind the falling notes so your
@@ -1275,9 +1372,11 @@
   if(location.search.indexOf("sitest") >= 0){
     window.__si = {
       key(){ return state.activeKey; },
+      tonality(){ return state.tonality; },
       rounds(){ return state.keyRounds; },
       lockTarget(){ return state.keyLockTarget; },
       interval(){ return state.current && state.current.interval; },
+      correctNote(){ return state.current && state.current.correctNote; },
       score(){ return state.score; },
       streak(){ return state.streak; },
       lives(){ return state.lives; },
