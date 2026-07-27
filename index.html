@@ -1,0 +1,1295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Scale Invaders — Learn Your Intervals</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%2214%22%20fill%3D%22%23161029%22%2F%3E%3Cellipse%20cx%3D%2223%22%20cy%3D%2245%22%20rx%3D%2211%22%20ry%3D%228%22%20fill%3D%22%23eab54c%22%2F%3E%3Crect%20x%3D%2232%22%20y%3D%2215%22%20width%3D%224%22%20height%3D%2232%22%20fill%3D%22%23eab54c%22%2F%3E%3Cpath%20d%3D%22M32%2015c14%202%2015%2015%207%2022%206-11-1-18-7-15z%22%20fill%3D%22%23eab54c%22%2F%3E%3C%2Fsvg%3E">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Bungee&family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;600;700&display=swap');
+
+  :root{
+    --bg-deep:#161029;
+    --bg-panel:#221a3d;
+    --bg-panel2:#2b2249;
+    --staff-line:#8b7fc0;
+    --gold:#eab54c;
+    --gold-bright:#ffd76e;
+    --coral:#e8604f;
+    --teal:#4fc4b0;
+    --cream:#f4eddc;
+    --text-dim:#a79bd1;
+    --font-display:'Bungee', system-ui, sans-serif;
+    --font-body:'Space Grotesk', system-ui, sans-serif;
+    --font-mono:'IBM Plex Mono', monospace;
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0; padding:0; width:100%; height:100%;
+    background:var(--bg-deep);
+    font-family:var(--font-body);
+    color:var(--cream);
+    overflow:hidden;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #app{
+    position:relative;
+    width:100vw; height:100vh; height:100dvh;
+    display:flex; flex-direction:column;
+    background:linear-gradient(180deg, #1a1332 0%, #120c22 100%);
+  }
+
+  /* ---------- shared bits ---------- */
+  button{
+    font-family:var(--font-body);
+    cursor:pointer;
+    border:none;
+    outline-offset:2px;
+  }
+  button:focus-visible, input:focus-visible, .chip:focus-visible{
+    outline:2px solid var(--teal);
+  }
+  .pill-btn{
+    background:var(--gold);
+    color:#1b1330;
+    font-weight:700;
+    border-radius:999px;
+    padding:12px 28px;
+    font-size:15px;
+    letter-spacing:.02em;
+    transition:transform .12s ease, background .12s ease;
+    box-shadow:0 4px 0 #a97e2c, 0 6px 14px rgba(0,0,0,.35);
+  }
+  .pill-btn:hover{ background:var(--gold-bright); }
+  .pill-btn:active{ transform:translateY(3px); box-shadow:0 1px 0 #a97e2c; }
+  .pill-btn.secondary{
+    background:transparent;
+    color:var(--cream);
+    border:2px solid var(--teal);
+    box-shadow:none;
+  }
+  .pill-btn.secondary:hover{ background:rgba(79,196,176,.12); }
+
+  /* ---------- start screen ---------- */
+  #startScreen{
+    position:absolute; inset:0;
+    display:flex; flex-direction:column; align-items:center; justify-content:flex-start;
+    padding:5vh 20px 24px;
+    overflow-y:auto;
+    z-index:20;
+    background:
+      radial-gradient(ellipse at 20% 0%, rgba(234,181,76,.10), transparent 55%),
+      radial-gradient(ellipse at 85% 25%, rgba(79,196,176,.10), transparent 50%),
+      var(--bg-deep);
+  }
+  .logo-wrap{ text-align:center; margin-bottom:6px; }
+  .logo-wrap h1{
+    font-family:var(--font-display);
+    font-size:clamp(30px,7vw,54px);
+    margin:0;
+    color:var(--gold);
+    text-shadow:0 0 18px rgba(234,181,76,.45), 0 4px 0 #6b3f1a;
+    letter-spacing:.02em;
+  }
+  .logo-wrap p{
+    margin:8px 0 0;
+    color:var(--text-dim);
+    font-size:14px;
+    max-width:480px;
+  }
+  .staff-strip{ margin:18px auto 6px; }
+
+  .cheat-sheet{
+    display:flex; flex-wrap:wrap; gap:8px; justify-content:center;
+    max-width:640px; margin:14px 0 6px;
+  }
+  .cheat-sheet span{
+    font-family:var(--font-mono);
+    font-size:12px;
+    background:var(--bg-panel);
+    border:1px solid rgba(139,127,192,.4);
+    color:var(--teal);
+    padding:5px 10px;
+    border-radius:8px;
+  }
+  .cheat-sheet span b{ color:var(--cream); font-weight:600; }
+
+  .mode-cards{
+    display:flex; gap:16px; flex-wrap:wrap; justify-content:center;
+    margin-top:22px; width:100%; max-width:680px;
+  }
+  .mode-card{
+    flex:1; min-width:230px;
+    background:var(--bg-panel);
+    border:1px solid rgba(139,127,192,.35);
+    border-radius:16px;
+    padding:18px 18px 20px;
+    display:flex; flex-direction:column; gap:10px;
+  }
+  .mode-card h3{
+    margin:0; font-size:17px; color:var(--gold-bright);
+    font-family:var(--font-body); font-weight:700;
+  }
+  .mode-card p{ margin:0; font-size:13px; color:var(--text-dim); line-height:1.5; }
+
+  .key-grid{
+    display:grid; grid-template-columns:repeat(4,1fr); gap:6px;
+    margin:20px 0 4px; width:100%; max-width:520px;
+  }
+  .key-grid-label{
+    font-family:var(--font-mono); font-size:11px; color:var(--text-dim);
+    text-transform:uppercase; letter-spacing:.08em; margin-top:18px; margin-bottom:2px;
+  }
+  .chip{
+    font-family:var(--font-mono); font-size:13px; font-weight:600;
+    background:var(--bg-panel); color:var(--text-dim);
+    border:1.5px solid rgba(139,127,192,.4);
+    border-radius:9px; padding:8px 4px; text-align:center;
+    user-select:none;
+  }
+  .chip.active{
+    background:rgba(234,181,76,.18);
+    border-color:var(--gold);
+    color:var(--gold-bright);
+  }
+  .chip-row-actions{ display:flex; gap:10px; margin-top:8px; }
+  .chip-row-actions button{
+    font-family:var(--font-mono); font-size:11px;
+    background:none; color:var(--teal); border:1px solid var(--teal);
+    border-radius:7px; padding:5px 10px;
+  }
+
+  .instructions{
+    margin-top:22px; font-size:12.5px; color:var(--text-dim);
+    text-align:center; max-width:460px; line-height:1.6;
+  }
+  .instructions b{ color:var(--cream); }
+
+  /* ---------- HUD ---------- */
+  #hud{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:10px 16px 6px; gap:10px; flex-wrap:wrap;
+    position:relative; z-index:5;
+  }
+  .hud-left{ display:flex; flex-direction:column; gap:2px; }
+  .hud-left .brand{
+    font-family:var(--font-display); font-size:15px; color:var(--gold);
+  }
+  .hud-left .key-name{
+    font-family:var(--font-body); font-weight:700; font-size:13px; color:var(--teal);
+  }
+  .hud-stats{
+    display:flex; gap:14px; font-family:var(--font-mono); font-size:13px;
+  }
+  .hud-stats .stat{ text-align:center; }
+  .hud-stats .stat .v{ font-size:16px; font-weight:700; color:var(--cream); }
+  .hud-stats .stat .l{ font-size:9px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.08em; }
+  #livesRow{ display:flex; gap:3px; justify-content:center; }
+  .life-dot{ width:9px; height:9px; border-radius:50%; background:var(--coral); box-shadow:0 0 6px var(--coral); }
+  .life-dot.lost{ background:rgba(255,255,255,.08); box-shadow:none; }
+
+  .hud-right{ display:flex; align-items:center; gap:10px; }
+  .icon-btn{
+    background:var(--bg-panel); color:var(--cream); border:1px solid rgba(139,127,192,.4);
+    border-radius:8px; width:34px; height:34px; font-size:15px; display:flex; align-items:center; justify-content:center;
+  }
+
+  #questionBanner{
+    text-align:center; padding:2px 16px 8px;
+    font-family:var(--font-body); font-weight:700; font-size:clamp(14px,3.6vw,20px);
+    color:var(--cream);
+    position:relative; z-index:5;
+  }
+  #questionBanner .find{ color:var(--text-dim); font-weight:500; }
+  #questionBanner .target{ color:var(--gold-bright); }
+
+  .helper-row{
+    display:flex; justify-content:center; gap:6px; padding-bottom:6px;
+    font-family:var(--font-mono); font-size:12px; flex-wrap:wrap;
+  }
+  .helper-note{
+    background:var(--bg-panel); border-radius:6px; padding:3px 8px; color:var(--text-dim);
+    border:1px solid rgba(139,127,192,.25);
+  }
+  .helper-note b{ display:block; font-size:9px; color:var(--text-dim); font-weight:400; }
+  .helper-note.target{ background:rgba(234,181,76,.16); color:var(--gold-bright); border-color:var(--gold); }
+
+  /* ---------- canvas area ---------- */
+  #canvasWrap{ flex:1; position:relative; min-height:0; }
+  #gameCanvas{ width:100%; height:100%; display:block; touch-action:none; }
+
+  #feedbackOverlay{
+    position:absolute; left:50%; top:38%; transform:translate(-50%,-50%);
+    font-family:var(--font-body); font-weight:700; font-size:clamp(18px,4vw,26px);
+    text-align:center; pointer-events:none; opacity:0; transition:opacity .15s ease;
+    text-shadow:0 2px 10px rgba(0,0,0,.6);
+  }
+  #feedbackOverlay.show{ opacity:1; }
+  #feedbackOverlay.good{ color:var(--gold-bright); }
+  #feedbackOverlay.bad{ color:var(--coral); }
+
+  /* transient key-change banner (flashes on key change) */
+  .flash-banner{
+    position:absolute; left:50%; top:0;
+    transform:translateX(-50%) scale(.96);
+    opacity:0; pointer-events:none; white-space:nowrap; text-align:center;
+    transition:opacity .22s ease, transform .22s ease;
+  }
+  .flash-banner.show{ opacity:1; transform:translateX(-50%) scale(1); }
+  #keyChangeBanner{
+    top:12%;
+    font-family:var(--font-display);
+    font-size:clamp(20px,5.2vw,34px);
+    color:var(--gold-bright);
+    text-shadow:0 0 18px rgba(234,181,76,.5), 0 3px 0 #6b3f1a;
+    letter-spacing:.02em;
+  }
+
+  /* ---------- footer / mobile controls ---------- */
+  #footerControls{
+    display:flex; align-items:center; justify-content:center; gap:14px;
+    padding:10px 14px calc(10px + env(safe-area-inset-bottom));
+    position:relative; z-index:5;
+  }
+  .mobile-btn{
+    width:60px; height:52px; border-radius:14px;
+    background:var(--bg-panel); color:var(--gold-bright);
+    border:1px solid rgba(139,127,192,.4);
+    font-size:20px; font-weight:700;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .mobile-btn:active{ background:var(--bg-panel2); }
+  #fireBtn{ background:var(--gold); color:#1b1330; width:80px; }
+  #fireBtn:active{ background:var(--gold-bright); }
+
+  /* ---------- game over ---------- */
+  #gameOverScreen{
+    position:absolute; inset:0; z-index:25;
+    display:none; align-items:center; justify-content:center; flex-direction:column; gap:10px;
+    background:rgba(15,10,28,.92);
+    text-align:center; padding:20px;
+  }
+  #gameOverScreen h2{
+    font-family:var(--font-display); color:var(--coral); font-size:clamp(24px,6vw,36px); margin:0 0 4px;
+  }
+  #gameOverScreen .final-stats{
+    font-family:var(--font-mono); font-size:14px; color:var(--text-dim); line-height:1.9;
+  }
+  #gameOverScreen .final-stats b{ color:var(--gold-bright); font-size:18px; }
+
+  #pauseOverlay{
+    position:absolute; inset:0; z-index:24; display:none;
+    align-items:center; justify-content:center; flex-direction:column; gap:14px;
+    background:rgba(15,10,28,.85);
+  }
+  #pauseOverlay h2{ font-family:var(--font-display); color:var(--cream); font-size:28px; margin:0; }
+
+  /* ---------- scale peek modal ---------- */
+  #scaleModal{
+    position:absolute; inset:0; z-index:23; display:none;
+    align-items:center; justify-content:center; padding:20px;
+    background:rgba(15,10,28,.55);
+  }
+  #scaleModal.show{ display:flex; }
+  .scale-modal-card{
+    background:var(--bg-panel);
+    border:1px solid var(--gold);
+    border-radius:16px; padding:18px 20px; text-align:center;
+    box-shadow:0 12px 40px rgba(0,0,0,.5);
+    max-width:min(92vw,520px);
+    animation:scalePop .16s ease;
+  }
+  .scale-modal-title{
+    font-family:var(--font-body); font-weight:700; font-size:15px;
+    color:var(--cream); margin-bottom:12px;
+  }
+  .scale-modal-title span{ color:var(--gold-bright); }
+  .scale-modal-card .helper-row{ display:flex; padding:0; }
+  .scale-modal-hint{
+    margin-top:12px; font-family:var(--font-mono); font-size:11px; color:var(--text-dim);
+  }
+  @keyframes scalePop{ from{ transform:scale(.92); opacity:0; } to{ transform:scale(1); opacity:1; } }
+
+  ::-webkit-scrollbar{ width:8px; }
+  ::-webkit-scrollbar-thumb{ background:var(--bg-panel2); border-radius:4px; }
+
+  @media (max-width:520px){
+    .key-grid{ grid-template-columns:repeat(3,1fr); }
+    .hud-stats{ gap:10px; }
+  }
+
+  /* Short landscape phones: reclaim vertical room so notes have space to fall.
+     Trim the chrome and lift the touch controls into the bottom corners of the
+     play area (movement left, fire right) instead of a full footer row. */
+  @media (orientation:landscape) and (max-height:520px){
+    #hud{ padding:6px 16px 2px; }
+    .hud-left .brand{ font-size:13px; }
+    .hud-left .key-name{ font-size:12px; }
+    #questionBanner{ padding:0 16px 3px; }
+    .helper-row{ padding-bottom:3px; }
+    .helper-note{ padding:2px 7px; }
+    #footerControls{
+      position:absolute; z-index:6;
+      left:0; right:0; bottom:0;
+      justify-content:flex-start; gap:12px;
+      padding:0 16px calc(8px + env(safe-area-inset-bottom));
+      background:none;
+      pointer-events:none;              /* let taps fall through the gaps to the canvas */
+    }
+    #footerControls .mobile-btn{
+      pointer-events:auto;
+      width:56px; height:44px; font-size:18px; opacity:.9;
+    }
+    #footerControls #fireBtn{ width:74px; order:3; margin-left:auto; }  /* both arrows left, fire pushed to the right edge */
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ============ START SCREEN ============ -->
+  <div id="startScreen">
+    <div class="logo-wrap">
+      <h1>SCALE INVADERS</h1>
+      <p>Blast the right note out of the sky before it lands. Every question names a key and an interval — you find the note.</p>
+    </div>
+
+    <canvas id="staffPreview" class="staff-strip" width="360" height="80"></canvas>
+
+    <div class="cheat-sheet" id="cheatSheet"></div>
+
+    <div class="mode-cards">
+      <div class="mode-card">
+        <h3>🚀 Arcade Mode</h3>
+        <p>Start with easy keys (C, F, G) and simple intervals. New keys and intervals unlock as your score climbs, and the notes fall faster.</p>
+        <button class="pill-btn" id="startArcadeBtn">Play Arcade</button>
+      </div>
+      <div class="mode-card">
+        <h3>🎯 Practice Mode</h3>
+        <p>Pick exactly the key(s) you're drilling. All interval types from the start, steady pace — good for focused practice.</p>
+        <button class="pill-btn secondary" id="startPracticeBtn">Play Practice</button>
+      </div>
+    </div>
+
+    <div class="key-grid-label">Keys for Practice Mode</div>
+    <div class="key-grid" id="keyGrid"></div>
+    <div class="chip-row-actions">
+      <button id="selectAllKeys">Select all</button>
+      <button id="selectNoneKeys">Clear</button>
+    </div>
+
+    <p class="instructions">
+      <b>◀ ▶ / A D</b> to move your ship &nbsp;·&nbsp; <b>Space / Tap</b> to fire &nbsp;·&nbsp;
+      Shoot the correct note before it reaches the bottom. Wrong shots cost a life — so does letting the right note fall past you.
+    </p>
+  </div>
+
+  <!-- ============ HUD ============ -->
+  <div id="hud" style="display:none;">
+    <div class="hud-left">
+      <div class="brand">SCALE INVADERS</div>
+      <div class="key-name" id="keyNameLabel">Key of C Major</div>
+    </div>
+    <div class="hud-stats">
+      <div class="stat"><div class="v" id="scoreVal">0</div><div class="l">Score</div></div>
+      <div class="stat"><div class="v" id="streakVal">0</div><div class="l">Streak</div></div>
+      <div class="stat"><div class="v" id="levelVal">1</div><div class="l">Level</div></div>
+      <div class="stat"><div id="livesRow"></div><div class="l">Lives</div></div>
+    </div>
+    <div class="hud-right">
+      <button class="icon-btn" id="scaleHelpBtn" title="Peek at the scale">?</button>
+      <button class="icon-btn" id="pauseBtn" title="Pause">❚❚</button>
+    </div>
+  </div>
+
+  <div id="questionBanner" style="display:none;">
+    <span class="find">Find the</span> <span class="target" id="targetIntervalLabel">Major 3rd</span>
+  </div>
+  <!-- ============ SCALE PEEK MODAL ============ -->
+  <div id="scaleModal">
+    <div class="scale-modal-card">
+      <div class="scale-modal-title">Key of <span id="scaleModalKey">C Major</span> · <span id="scaleModalIv">Major 3rd</span></div>
+      <div class="helper-row" id="helperRow"></div>
+      <div class="scale-modal-hint">Quick peek — the notes keep falling!</div>
+    </div>
+  </div>
+
+  <!-- ============ GAME CANVAS ============ -->
+  <div id="canvasWrap" style="display:none;">
+    <canvas id="gameCanvas"></canvas>
+    <div id="keyChangeBanner" class="flash-banner"></div>
+    <div id="feedbackOverlay"></div>
+  </div>
+
+  <!-- ============ FOOTER / MOBILE CONTROLS ============ -->
+  <div id="footerControls" style="display:none;">
+    <button class="mobile-btn" id="leftBtn">◀</button>
+    <button class="mobile-btn" id="fireBtn">FIRE</button>
+    <button class="mobile-btn" id="rightBtn">▶</button>
+  </div>
+
+  <!-- ============ PAUSE ============ -->
+  <div id="pauseOverlay">
+    <h2>Paused</h2>
+    <button class="pill-btn" id="resumeBtn">Resume</button>
+    <button class="pill-btn secondary" id="quitBtn">Quit to menu</button>
+  </div>
+
+  <!-- ============ GAME OVER ============ -->
+  <div id="gameOverScreen">
+    <h2>Ship Down!</h2>
+    <div class="final-stats">
+      Final score: <b id="finalScore">0</b><br>
+      Best streak: <b id="finalStreak">0</b><br>
+      Level reached: <b id="finalLevel">1</b>
+    </div>
+    <div style="display:flex; gap:12px; margin-top:14px;">
+      <button class="pill-btn" id="retryBtn">Play again</button>
+      <button class="pill-btn secondary" id="menuBtn">Main menu</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* =========================================================
+     MUSIC THEORY DATA
+     ========================================================= */
+  const KEYS = {
+    "C":  ["C","D","E","F","G","A","B"],
+    "G":  ["G","A","B","C","D","E","F#"],
+    "D":  ["D","E","F#","G","A","B","C#"],
+    "A":  ["A","B","C#","D","E","F#","G#"],
+    "E":  ["E","F#","G#","A","B","C#","D#"],
+    "B":  ["B","C#","D#","E","F#","G#","A#"],
+    "F":  ["F","G","A","Bb","C","D","E"],
+    "Bb": ["Bb","C","D","Eb","F","G","A"],
+    "Eb": ["Eb","F","G","Ab","Bb","C","D"],
+    "Ab": ["Ab","Bb","C","Db","Eb","F","G"],
+    "Db": ["Db","Eb","F","Gb","Ab","Bb","C"]
+  };
+  const KEY_ORDER = ["C","G","D","A","E","B","F","Bb","Eb","Ab","Db"];
+
+  const KEY_SIG = {
+    "C":{type:null,count:0}, "G":{type:"sharp",count:1}, "D":{type:"sharp",count:2},
+    "A":{type:"sharp",count:3}, "E":{type:"sharp",count:4}, "B":{type:"sharp",count:5},
+    "F":{type:"flat",count:1}, "Bb":{type:"flat",count:2}, "Eb":{type:"flat",count:3},
+    "Ab":{type:"flat",count:4}, "Db":{type:"flat",count:5}
+  };
+
+  const SHARP_ORDER = ["F#","C#","G#","D#","A#","E#"];
+  const SHARP_POS   = {"F#":0, "C#":3, "G#":-1, "D#":2, "A#":5, "E#":1}; // half-line-steps from top staff line
+  const FLAT_ORDER  = ["Bb","Eb","Ab","Db","Gb"];
+  const FLAT_POS    = {"Bb":4, "Eb":1, "Ab":5, "Db":2, "Gb":6};
+
+  const INTERVALS = [
+    {deg:2, name:"Major 2nd"},
+    {deg:3, name:"Major 3rd"},
+    {deg:4, name:"Perfect 4th"},
+    {deg:5, name:"Perfect 5th"},
+    {deg:6, name:"Major 6th"},
+    {deg:7, name:"Major 7th"}
+  ];
+
+  const LETTER_INDEX    = {C:0,D:1,E:2,F:3,G:4,A:5,B:6};
+  const LETTER_SEMITONE = {C:0,D:2,E:4,F:5,G:7,A:9,B:11};
+
+  function noteSemitone(note){
+    let letter = note[0];
+    let acc = note.slice(1);
+    let s = LETTER_SEMITONE[letter];
+    if(acc === "#") s += 1;
+    if(acc === "b") s -= 1;
+    return ((s % 12) + 12) % 12;
+  }
+
+  // Build ascending scale (from tonic) with octave numbers so we can compute real pitch.
+  function buildScaleOctaves(scaleNotes){
+    let octave = 4;
+    let prevIdx = -1;
+    return scaleNotes.map((note, i) => {
+      const idx = LETTER_INDEX[note[0]];
+      if(i > 0 && idx <= prevIdx) octave += 1;
+      prevIdx = idx;
+      return {note, octave};
+    });
+  }
+  const SCALE_OCTAVES = {};
+  KEY_ORDER.forEach(k => { SCALE_OCTAVES[k] = buildScaleOctaves(KEYS[k]); });
+
+  function noteFrequency(note, octave){
+    const midi = (octave + 1) * 12 + noteSemitone(note);
+    return 440 * Math.pow(2, (midi - 69) / 12);
+  }
+
+  function keyDisplayName(k){ return k + " Major"; }
+
+  /* =========================================================
+     LEVEL PROGRESSION (arcade mode)
+     ========================================================= */
+  // C Major has no sharps/flats, so it's trivial for interval drilling — keep it
+  // out of arcade entirely (it stays selectable in Practice mode).
+  const ARCADE_KEYS = KEY_ORDER.filter(k => k !== "C");
+  const LEVELS = [
+    {minScore:0,   keys:["F","G","D"],                               intervals:[1,3],           objects:3, speed:46},
+    {minScore:70,  keys:["F","G","D","Bb"],                          intervals:[1,2,3,4],       objects:4, speed:54},
+    {minScore:180, keys:["F","G","D","Bb","A","Eb"],                 intervals:[0,1,2,3,4,5],   objects:4, speed:62},
+    {minScore:320, keys:["F","G","D","Bb","A","Eb","E","Ab"],        intervals:[0,1,2,3,4,5],   objects:5, speed:72},
+    {minScore:500, keys:ARCADE_KEYS.slice(),                          intervals:[0,1,2,3,4,5],   objects:5, speed:84},
+    {minScore:720, keys:ARCADE_KEYS.slice(),                          intervals:[0,1,2,3,4,5],   objects:6, speed:98}
+  ];
+  function levelForScore(score){
+    let idx = 0;
+    for(let i=0;i<LEVELS.length;i++){ if(score >= LEVELS[i].minScore) idx = i; }
+    return idx;
+  }
+
+  /* =========================================================
+     AUDIO
+     ========================================================= */
+  let actx = null;
+  function ensureAudio(){ if(!actx){ actx = new (window.AudioContext||window.webkitAudioContext)(); } return actx; }
+  function beep(freq, dur, type, gainPeak){
+    try{
+      const ctx = ensureAudio();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = type || "sine";
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(gainPeak||0.18, ctx.currentTime+0.015);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime+dur);
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.start(); osc.stop(ctx.currentTime+dur+0.02);
+    }catch(e){ /* audio not available, ignore */ }
+  }
+  function playCorrect(note, octave, tonicNote, tonicOctave){
+    // play the tonic first, then the target note, so you hear the interval
+    // ascending in the context of the key (tonic -> target)
+    beep(noteFrequency(tonicNote, tonicOctave), 0.32, "triangle", 0.15);
+    setTimeout(()=>{
+      beep(noteFrequency(note, octave), 0.5, "triangle", 0.2);
+      setTimeout(()=>beep(noteFrequency(note, octave)*2, 0.35, "sine", 0.12), 90);
+    }, 260);
+  }
+  function playWrong(){ beep(110, 0.35, "sawtooth", 0.15); }
+  function playShoot(){ beep(660, 0.06, "square", 0.05); }
+  function playLifeLost(){ beep(90, 0.5, "sawtooth", 0.18); }
+
+  /* =========================================================
+     STATE
+     ========================================================= */
+  const state = {
+    mode: "arcade",           // "arcade" | "practice"
+    practiceKeys: KEY_ORDER.slice(),
+    score: 0, streak: 0, bestStreak: 0, lives: 3, level: 0,
+    activeKey: null, keyRounds: 0, keyLockTarget: 10, lastIvIdx: null,  // stay in one key for a randomized run
+    running: false, paused: false,
+    current: null,            // {key, interval, correctNote, correctOctave}
+    objects: [],               // falling notes
+    bullets: [],
+    particles: [],
+    shipX: 0,
+    lastFire: 0,
+    questionLock: false        // true during feedback pause between questions
+  };
+
+  /* =========================================================
+     DOM REFS
+     ========================================================= */
+  const el = {
+    startScreen: document.getElementById("startScreen"),
+    hud: document.getElementById("hud"),
+    questionBanner: document.getElementById("questionBanner"),
+    helperRow: document.getElementById("helperRow"),
+    canvasWrap: document.getElementById("canvasWrap"),
+    footerControls: document.getElementById("footerControls"),
+    gameOverScreen: document.getElementById("gameOverScreen"),
+    pauseOverlay: document.getElementById("pauseOverlay"),
+    canvas: document.getElementById("gameCanvas"),
+    feedbackOverlay: document.getElementById("feedbackOverlay"),
+    keyChangeBanner: document.getElementById("keyChangeBanner"),
+    keyNameLabel: document.getElementById("keyNameLabel"),
+    targetIntervalLabel: document.getElementById("targetIntervalLabel"),
+    scoreVal: document.getElementById("scoreVal"),
+    streakVal: document.getElementById("streakVal"),
+    levelVal: document.getElementById("levelVal"),
+    livesRow: document.getElementById("livesRow"),
+    scaleHelpBtn: document.getElementById("scaleHelpBtn"),
+    scaleModal: document.getElementById("scaleModal"),
+    scaleModalKey: document.getElementById("scaleModalKey"),
+    scaleModalIv: document.getElementById("scaleModalIv"),
+    keyGrid: document.getElementById("keyGrid"),
+    cheatSheet: document.getElementById("cheatSheet")
+  };
+  const ctx = el.canvas.getContext("2d");
+
+  /* =========================================================
+     START SCREEN: build key grid + cheat sheet + preview staff
+     ========================================================= */
+  KEY_ORDER.forEach(k => {
+    const chip = document.createElement("div");
+    chip.className = "chip active";
+    chip.textContent = keyDisplayName(k).replace(" Major","");
+    chip.dataset.key = k;
+    chip.tabIndex = 0;
+    chip.addEventListener("click", () => toggleKeyChip(chip, k));
+    chip.addEventListener("keydown", (e) => { if(e.key==="Enter"||e.key===" "){ e.preventDefault(); toggleKeyChip(chip,k);} });
+    el.keyGrid.appendChild(chip);
+  });
+  function toggleKeyChip(chip, k){
+    chip.classList.toggle("active");
+    if(chip.classList.contains("active")){
+      if(!state.practiceKeys.includes(k)) state.practiceKeys.push(k);
+    } else {
+      state.practiceKeys = state.practiceKeys.filter(x => x !== k);
+    }
+  }
+  document.getElementById("selectAllKeys").addEventListener("click", () => {
+    state.practiceKeys = KEY_ORDER.slice();
+    el.keyGrid.querySelectorAll(".chip").forEach(c => c.classList.add("active"));
+  });
+  document.getElementById("selectNoneKeys").addEventListener("click", () => {
+    state.practiceKeys = [];
+    el.keyGrid.querySelectorAll(".chip").forEach(c => c.classList.remove("active"));
+  });
+
+  INTERVALS.forEach(iv => {
+    const span = document.createElement("span");
+    span.innerHTML = "<b>" + iv.deg + "</b>" + iv.name.replace(/^(Major|Perfect) /,"");
+    el.cheatSheet.appendChild(span);
+  });
+
+  /* =========================================================
+     STAFF DRAWING (used both in the mini preview and in-game)
+     ========================================================= */
+  function drawStaff(g, x0, topY, width, keyName, lineSpacing){
+    const ls = lineSpacing;
+    const half = ls/2;
+    g.strokeStyle = "rgba(139,127,192,0.85)";
+    g.lineWidth = 1.4;
+    for(let i=0;i<5;i++){
+      const y = topY + i*ls;
+      g.beginPath();
+      g.moveTo(x0, y);
+      g.lineTo(x0+width, y);
+      g.stroke();
+    }
+    // clef
+    g.fillStyle = "#eab54c";
+    g.font = (ls*4.6) + "px serif";
+    g.textBaseline = "alphabetic";
+    g.fillText("\uD834\uDD1E", x0 - ls*0.3, topY + ls*4 + ls*1.1);
+
+    // key signature
+    const sig = KEY_SIG[keyName];
+    let sx = x0 + ls*3.4;
+    if(sig && sig.count > 0){
+      const order = sig.type === "sharp" ? SHARP_ORDER : FLAT_ORDER;
+      const posMap = sig.type === "sharp" ? SHARP_POS : FLAT_POS;
+      const glyph = sig.type === "sharp" ? "\u266F" : "\u266D";
+      g.font = (ls*1.9) + "px sans-serif";
+      g.fillStyle = "#eab54c";
+      for(let i=0;i<sig.count;i++){
+        const name = order[i];
+        const pos = posMap[name];
+        const y = topY + pos*half;
+        g.fillText(glyph, sx, y + ls*0.55);
+        sx += ls*1.05;
+      }
+    }
+    return sx; // x position after signature, useful for layout
+  }
+
+  // mini preview on start screen, cycles through a few keys just for atmosphere
+  const previewCanvas = document.getElementById("staffPreview");
+  const previewCtx = previewCanvas.getContext("2d");
+  let previewKeyIdx = 0;
+  function drawPreview(){
+    previewCtx.clearRect(0,0,previewCanvas.width, previewCanvas.height);
+    drawStaff(previewCtx, 46, 24, 280, KEY_ORDER[previewKeyIdx], 11);
+  }
+  drawPreview();
+  setInterval(() => {
+    previewKeyIdx = (previewKeyIdx + 1) % KEY_ORDER.length;
+    drawPreview();
+  }, 1800);
+
+  /* =========================================================
+     CANVAS SIZING
+     ========================================================= */
+  let W = 0, H = 0, DPR = 1;
+  function resizeCanvas(){
+    const rect = el.canvas.getBoundingClientRect();
+    W = rect.width; H = rect.height;
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    el.canvas.width = Math.round(W*DPR);
+    el.canvas.height = Math.round(H*DPR);
+    ctx.setTransform(DPR,0,0,DPR,0,0);
+    state.shipX = W/2;
+  }
+  window.addEventListener("resize", resizeCanvas);
+
+  /* =========================================================
+     STARFIELD (ambient, subtle)
+     ========================================================= */
+  let stars = [];
+  function initStars(){
+    stars = [];
+    const count = Math.floor((W*H)/9000);
+    for(let i=0;i<count;i++){
+      stars.push({x:Math.random()*W, y:Math.random()*H, r:Math.random()*1.4+0.3, phase:Math.random()*Math.PI*2, speed:0.4+Math.random()*0.6});
+    }
+  }
+
+  /* =========================================================
+     QUESTION GENERATION
+     ========================================================= */
+  function currentPool(){
+    if(state.mode === "practice"){
+      const keys = state.practiceKeys.length ? state.practiceKeys : ["C"];
+      return {keys, intervalIdx:[0,1,2,3,4,5], objects:4, speed:58};
+    }
+    const lvl = LEVELS[state.level];
+    return {keys:lvl.keys, intervalIdx:lvl.intervals, objects:lvl.objects, speed:lvl.speed};
+  }
+
+  function shuffle(arr){
+    const a = arr.slice();
+    for(let i=a.length-1;i>0;i--){
+      const j = Math.floor(Math.random()*(i+1));
+      [a[i],a[j]] = [a[j],a[i]];
+    }
+    return a;
+  }
+
+  function laneX(i, n){
+    const pad = 60;
+    const usable = W - pad*2;
+    return pad + (usable/(n-1||1))*i + (n===1 ? usable/2 : 0);
+  }
+
+  function ordinal(n){ return n + (["th","st","nd","rd"][(n%100>10&&n%100<14)?0:(n%10<4?n%10:0)]); }
+
+  function newQuestion(){
+    state.questionLock = false;
+    const pool = currentPool();
+
+    // sticky key: reuse the current key for a randomized run of questions (8–12),
+    // then switch to a different key when the pool allows
+    let keyChanged = false;
+    if(!state.activeKey || !pool.keys.includes(state.activeKey) || state.keyRounds >= state.keyLockTarget){
+      const prev = state.activeKey;
+      let candidates = pool.keys.filter(k => k !== prev);
+      if(candidates.length === 0) candidates = pool.keys.slice();
+      state.activeKey = candidates[Math.floor(Math.random()*candidates.length)];
+      state.keyRounds = 0;
+      state.keyLockTarget = 8 + Math.floor(Math.random()*5);   // 8..12
+      keyChanged = state.activeKey !== prev;
+    }
+    const key = state.activeKey;
+    state.keyRounds += 1;
+
+    // avoid repeating the previous interval, so no two questions in a row are identical
+    let ivChoices = pool.intervalIdx;
+    if(ivChoices.length > 1 && state.lastIvIdx != null){
+      const filtered = ivChoices.filter(i => i !== state.lastIvIdx);
+      if(filtered.length) ivChoices = filtered;
+    }
+    const ivIdx = ivChoices[Math.floor(Math.random()*ivChoices.length)];
+    state.lastIvIdx = ivIdx;
+    const interval = INTERVALS[ivIdx];
+    const scale = KEYS[key];
+    const scaleOct = SCALE_OCTAVES[key];
+    const correctIndex = interval.deg - 1;
+    const correctNote = scale[correctIndex];
+    const correctOctave = scaleOct[correctIndex].octave;
+
+    state.current = {key, interval, correctNote, correctOctave, correctIndex};
+
+    // build falling objects
+    const numObjects = Math.min(pool.objects, 7);
+    const distractorIdx = shuffle(scale.map((_,i)=>i).filter(i=>i!==correctIndex)).slice(0, numObjects-1);
+    const allIdx = shuffle([correctIndex, ...distractorIdx]);
+    const n = allIdx.length;
+    state.objects = allIdx.map((idxInScale, lane) => ({
+      note: scale[idxInScale],
+      octave: scaleOct[idxInScale].octave,
+      isCorrect: idxInScale === correctIndex,
+      x: laneX(lane, n),
+      y: -40 - lane*46,
+      hit:false,
+      flash:0
+    }));
+
+    // update DOM
+    el.keyNameLabel.textContent = "Key of " + keyDisplayName(key);
+    el.targetIntervalLabel.textContent = interval.name;
+
+    // scale reference — populated here but only revealed as a brief modal peek
+    el.helperRow.innerHTML = "";
+    scale.forEach((note, i) => {
+      const d = document.createElement("div");
+      d.className = "helper-note" + (i===correctIndex ? " target" : "");
+      d.innerHTML = "<b>"+(i+1)+"</b>"+note;
+      el.helperRow.appendChild(d);
+    });
+    el.scaleModalKey.textContent = keyDisplayName(key);
+    el.scaleModalIv.textContent = interval.name;
+    hideScaleModal();
+
+    // announce a key change (the target degree is drawn as a persistent
+    // center-of-screen aid in draw(), so your eyes stay on the falling notes)
+    if(keyChanged) flashBanner(el.keyChangeBanner, "Key of " + keyDisplayName(key), 1800);
+  }
+
+  /* =========================================================
+     GAME FLOW
+     ========================================================= */
+  function updateHUD(){
+    el.scoreVal.textContent = state.score;
+    el.streakVal.textContent = state.streak;
+    el.levelVal.textContent = state.level+1;
+    el.livesRow.innerHTML = "";
+    for(let i=0;i<3;i++){
+      const d = document.createElement("div");
+      d.className = "life-dot" + (i < state.lives ? "" : " lost");
+      el.livesRow.appendChild(d);
+    }
+  }
+
+  function showFeedback(text, good, dur){
+    el.feedbackOverlay.textContent = text;
+    el.feedbackOverlay.className = "show " + (good ? "good" : "bad");
+    clearTimeout(showFeedback._t);
+    showFeedback._t = setTimeout(()=>{ el.feedbackOverlay.className = ""; }, dur || 900);
+  }
+
+  function flashBanner(elm, text, dur){
+    elm.textContent = text;
+    elm.classList.add("show");
+    clearTimeout(elm._t);
+    elm._t = setTimeout(()=>{ elm.classList.remove("show"); }, dur);
+  }
+  function hideBanners(){
+    clearTimeout(el.keyChangeBanner._t);
+    el.keyChangeBanner.classList.remove("show");
+  }
+
+  function spawnParticles(x,y,color,count){
+    if(reduceMotion) return;
+    for(let i=0;i<count;i++){
+      const ang = Math.random()*Math.PI*2;
+      const spd = 40+Math.random()*90;
+      state.particles.push({
+        x,y, vx:Math.cos(ang)*spd, vy:Math.sin(ang)*spd,
+        life:0.6+Math.random()*0.3, age:0, color, size:2+Math.random()*2.5
+      });
+    }
+  }
+
+  function correctHit(obj){
+    const bonus = Math.min(state.streak*2, 20);
+    state.score += 10 + bonus;
+    state.streak += 1;
+    state.bestStreak = Math.max(state.bestStreak, state.streak);
+    if(state.mode === "arcade") state.level = levelForScore(state.score);
+    const tonic = SCALE_OCTAVES[state.current.key][0];
+    playCorrect(obj.note, obj.octave, tonic.note, tonic.octave);
+    spawnParticles(obj.x, obj.y, "#eab54c", 18);
+    showFeedback(obj.note + " ✓  " + state.current.interval.name, true);
+    updateHUD();
+    state.objects.forEach(o => o.hit = true); // clear board
+    state.questionLock = true;
+    setTimeout(() => { if(state.running && !state.paused) newQuestion(); }, 700);
+  }
+
+  const WRONG_PENALTY = 5;
+  function wrongHit(obj){
+    // non-lethal: wrong shots reset the streak and cost points, but never a life.
+    // death only happens when the correct note reaches the ground (missedCorrect).
+    state.streak = 0;
+    state.score = Math.max(0, state.score - WRONG_PENALTY);
+    playWrong();
+    spawnParticles(obj.x, obj.y, "#e8604f", 12);
+    showFeedback(obj.note + " ✗  −" + WRONG_PENALTY, false);
+    updateHUD();
+    obj.hit = true;
+  }
+
+  function missedCorrect(){
+    state.streak = 0;
+    state.lives -= 1;
+    playLifeLost();
+    // hold the "It was X" message longer so it's readable before moving on
+    showFeedback("Missed! It was " + state.current.correctNote, false, 1300);
+    updateHUD();
+    state.objects.forEach(o => o.hit = true);
+    state.questionLock = true;
+    if(state.lives <= 0){ setTimeout(endGame, 1300); }
+    else setTimeout(() => { if(state.running && !state.paused) newQuestion(); }, 1400);
+  }
+
+  function endGame(){
+    state.running = false;
+    hideScaleModal();
+    hideBanners();
+    document.getElementById("finalScore").textContent = state.score;
+    document.getElementById("finalStreak").textContent = state.bestStreak;
+    document.getElementById("finalLevel").textContent = state.level+1;
+    el.gameOverScreen.style.display = "flex";
+  }
+
+  function fireBullet(){
+    const now = performance.now();
+    if(now - state.lastFire < 230) return;
+    state.lastFire = now;
+    playShoot();
+    state.bullets.push({x:state.shipX, y:H-78});
+  }
+
+  /* =========================================================
+     UPDATE / DRAW LOOP
+     ========================================================= */
+  let lastT = 0;
+  function loop(t){
+    requestAnimationFrame(loop);
+    if(!state.running || state.paused) { lastT = t; return; }
+    const dt = Math.min((t-lastT)/1000, 0.05) || 0;
+    lastT = t;
+    update(dt);
+    draw();
+  }
+
+  function update(dt){
+    const pool = currentPool();
+    const fallSpeed = state.mode==="arcade" ? LEVELS[state.level].speed : pool.speed;
+
+    // ship
+    if(keys.left) state.shipX -= 320*dt;
+    if(keys.right) state.shipX += 320*dt;
+    state.shipX = Math.max(30, Math.min(W-30, state.shipX));
+
+    // bullets
+    state.bullets.forEach(b => b.y -= 480*dt);
+    state.bullets = state.bullets.filter(b => b.y > 20);
+
+    // falling notes
+    if(!state.questionLock){
+      state.objects.forEach(o => { if(!o.hit) o.y += fallSpeed*dt; });
+    }
+
+    // collisions
+    state.bullets.forEach(b => {
+      state.objects.forEach(o => {
+        if(o.hit || b.consumed) return;
+        if(Math.abs(b.x-o.x) < 26 && Math.abs(b.y-o.y) < 22){
+          b.consumed = true;
+          if(o.isCorrect) correctHit(o); else wrongHit(o);
+        }
+      });
+    });
+    state.bullets = state.bullets.filter(b => !b.consumed);
+
+    // off-screen check
+    if(!state.questionLock){
+      state.objects.forEach(o => {
+        if(!o.hit && o.y > H-70){
+          o.hit = true;
+          if(o.isCorrect) missedCorrect();
+        }
+      });
+    }
+
+    // particles
+    state.particles.forEach(p => {
+      p.age += dt; p.x += p.vx*dt; p.y += p.vy*dt; p.vy += 60*dt;
+    });
+    state.particles = state.particles.filter(p => p.age < p.life);
+
+    // stars drift
+    if(!reduceMotion){
+      stars.forEach(s => { s.y += s.speed*dt*6; if(s.y>H) s.y = 0; });
+    }
+  }
+
+  function drawShip(x,y){
+    ctx.save();
+    ctx.translate(x,y);
+    // thruster flicker
+    if(!reduceMotion){
+      const flick = 8+Math.random()*8;
+      ctx.beginPath();
+      ctx.moveTo(-7,16); ctx.lineTo(7,16); ctx.lineTo(0,16+flick);
+      ctx.closePath();
+      ctx.fillStyle = "rgba(232,96,79,0.85)";
+      ctx.fill();
+    }
+    ctx.beginPath();
+    ctx.moveTo(0,-20);
+    ctx.lineTo(18,16);
+    ctx.lineTo(6,10);
+    ctx.lineTo(0,16);
+    ctx.lineTo(-6,10);
+    ctx.lineTo(-18,16);
+    ctx.closePath();
+    ctx.fillStyle = "#eab54c";
+    ctx.shadowColor = "rgba(234,181,76,0.6)";
+    ctx.shadowBlur = 12;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = "#4fc4b0";
+    ctx.beginPath();
+    ctx.arc(0,-2,4,0,Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawNote(o){
+    ctx.save();
+    ctx.translate(o.x, o.y);
+    ctx.rotate(-0.28);
+    ctx.beginPath();
+    ctx.ellipse(0,0,10,7.5,0,0,Math.PI*2);
+    ctx.fillStyle = "#f4eddc";
+    ctx.fill();
+    ctx.lineWidth = 1.4;
+    ctx.strokeStyle = "#1b1330";
+    ctx.stroke();
+    ctx.restore();
+    // stem
+    ctx.beginPath();
+    ctx.moveTo(o.x+9, o.y);
+    ctx.lineTo(o.x+9, o.y-26);
+    ctx.strokeStyle = "#f4eddc";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    // label
+    ctx.font = "700 13px 'IBM Plex Mono', monospace";
+    ctx.fillStyle = "#eab54c";
+    ctx.textAlign = "center";
+    ctx.fillText(o.note, o.x, o.y+22);
+  }
+
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    // background wash
+    const grad = ctx.createLinearGradient(0,0,0,H);
+    grad.addColorStop(0,"#1a1332");
+    grad.addColorStop(1,"#100b1e");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0,0,W,H);
+
+    // stars
+    ctx.save();
+    stars.forEach(s => {
+      const tw = reduceMotion ? 0.6 : (0.5+0.5*Math.sin(performance.now()/700 + s.phase));
+      ctx.globalAlpha = 0.15+tw*0.5;
+      ctx.fillStyle = "#cfc6ee";
+      ctx.beginPath();
+      ctx.arc(s.x,s.y,s.r,0,Math.PI*2);
+      ctx.fill();
+    });
+    ctx.restore();
+
+    // staff
+    if(state.current){
+      drawStaff(ctx, 66, 18, W-110, state.current.key, 10);
+    }
+
+    // persistent target-degree aid, centered behind the falling notes so your
+    // eyes can stay down in the play area instead of glancing up to the banner
+    if(state.current){
+      const cx = W/2, cy = H*0.47;
+      const numSize = Math.max(64, Math.min(W*0.4, H*0.46));
+      ctx.save();
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      // key name (top of the aid)
+      ctx.globalAlpha = 0.32;
+      ctx.fillStyle = "#eab54c";
+      ctx.font = "700 " + Math.round(numSize*0.2) + "px 'Bungee', system-ui, sans-serif";
+      ctx.fillText(keyDisplayName(state.current.key).toUpperCase(), cx, cy - numSize*0.62);
+      // big target degree
+      ctx.globalAlpha = 0.16;
+      ctx.fillStyle = "#f4eddc";
+      ctx.font = "700 " + Math.round(numSize) + "px 'Bungee', system-ui, sans-serif";
+      ctx.fillText(ordinal(state.current.interval.deg), cx, cy);
+      // caption
+      ctx.globalAlpha = 0.28;
+      ctx.fillStyle = "#4fc4b0";
+      ctx.font = "700 " + Math.round(numSize*0.15) + "px 'IBM Plex Mono', monospace";
+      ctx.fillText("DEGREE TO FIND", cx, cy + numSize*0.6);
+      ctx.restore();
+    }
+
+    // falling notes
+    state.objects.forEach(o => { if(!o.hit) drawNote(o); });
+
+    // bullets
+    ctx.fillStyle = "#ffd76e";
+    state.bullets.forEach(b => {
+      ctx.save();
+      ctx.shadowColor = "rgba(255,215,110,0.8)";
+      ctx.shadowBlur = 8;
+      ctx.fillRect(b.x-2, b.y-9, 4, 16);
+      ctx.restore();
+    });
+
+    // particles
+    state.particles.forEach(p => {
+      const alpha = 1-(p.age/p.life);
+      ctx.globalAlpha = Math.max(alpha,0);
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(p.x,p.y,p.size,0,Math.PI*2);
+      ctx.fill();
+    });
+    ctx.globalAlpha = 1;
+
+    // ship
+    drawShip(state.shipX, H-56);
+
+    // ground line
+    ctx.strokeStyle = "rgba(139,127,192,0.3)";
+    ctx.beginPath();
+    ctx.moveTo(0,H-70); ctx.lineTo(W,H-70);
+    ctx.stroke();
+  }
+
+  /* =========================================================
+     INPUT
+     ========================================================= */
+  const keys = {left:false, right:false};
+  window.addEventListener("keydown", (e) => {
+    if(!state.running) return;
+    if(e.code === "ArrowLeft" || e.code === "KeyA") keys.left = true;
+    if(e.code === "ArrowRight" || e.code === "KeyD") keys.right = true;
+    if(e.code === "Space"){ e.preventDefault(); fireBullet(); }
+    if(e.code === "Escape") togglePause();
+  });
+  window.addEventListener("keyup", (e) => {
+    if(e.code === "ArrowLeft" || e.code === "KeyA") keys.left = false;
+    if(e.code === "ArrowRight" || e.code === "KeyD") keys.right = false;
+  });
+
+  el.canvas.addEventListener("pointerdown", (e) => {
+    if(!state.running) return;
+    const rect = el.canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    state.shipX = Math.max(30, Math.min(W-30, x));
+    fireBullet();
+  });
+  el.canvas.addEventListener("pointermove", (e) => {
+    if(!state.running || e.buttons !== 1) return;
+    const rect = el.canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    state.shipX = Math.max(30, Math.min(W-30, x));
+  });
+
+  function bindHold(elm, onDown, onUp){
+    elm.addEventListener("pointerdown", (e)=>{ e.preventDefault(); onDown(); });
+    elm.addEventListener("pointerup", onUp);
+    elm.addEventListener("pointerleave", onUp);
+    elm.addEventListener("pointercancel", onUp);
+  }
+  bindHold(document.getElementById("leftBtn"), ()=>keys.left=true, ()=>keys.left=false);
+  bindHold(document.getElementById("rightBtn"), ()=>keys.right=true, ()=>keys.right=false);
+  document.getElementById("fireBtn").addEventListener("pointerdown", (e)=>{ e.preventDefault(); fireBullet(); });
+
+  // show mobile controls on touch devices
+  if(('ontouchstart' in window) || navigator.maxTouchPoints > 0){
+    el.footerControls.style.display = "flex";
+  }
+
+  let scaleModalTimer = null;
+  function showScaleModal(){
+    if(!state.running || state.paused) return;
+    el.scaleModal.classList.add("show");
+    clearTimeout(scaleModalTimer);
+    scaleModalTimer = setTimeout(hideScaleModal, 2500);
+  }
+  function hideScaleModal(){
+    clearTimeout(scaleModalTimer);
+    el.scaleModal.classList.remove("show");
+  }
+  el.scaleHelpBtn.addEventListener("click", showScaleModal);
+  el.scaleModal.addEventListener("click", hideScaleModal);
+
+  /* =========================================================
+     SCREEN MANAGEMENT
+     ========================================================= */
+  function startGame(mode){
+    ensureAudio();
+    state.mode = mode;
+    state.score = 0; state.streak = 0; state.bestStreak = 0; state.lives = 3; state.level = 0;
+    state.activeKey = null; state.keyRounds = 0; state.keyLockTarget = 0; state.lastIvIdx = null;
+    state.bullets = []; state.particles = []; state.objects = [];
+    el.startScreen.style.display = "none";
+    el.gameOverScreen.style.display = "none";
+    el.hud.style.display = "flex";
+    el.questionBanner.style.display = "block";
+    el.canvasWrap.style.display = "block";
+    resizeCanvas();
+    initStars();
+    updateHUD();
+    newQuestion();
+    state.running = true; state.paused = false;
+    lastT = performance.now();
+  }
+
+  function togglePause(){
+    if(!state.running) return;
+    state.paused = !state.paused;
+    if(state.paused){ hideScaleModal(); hideBanners(); }
+    el.pauseOverlay.style.display = state.paused ? "flex" : "none";
+  }
+
+  function backToMenu(){
+    state.running = false;
+    hideScaleModal();
+    hideBanners();
+    el.startScreen.style.display = "flex";
+    el.hud.style.display = "none";
+    el.questionBanner.style.display = "none";
+    el.canvasWrap.style.display = "none";
+    el.gameOverScreen.style.display = "none";
+    el.pauseOverlay.style.display = "none";
+  }
+
+  document.getElementById("startArcadeBtn").addEventListener("click", () => startGame("arcade"));
+  document.getElementById("startPracticeBtn").addEventListener("click", () => startGame("practice"));
+  document.getElementById("pauseBtn").addEventListener("click", togglePause);
+  document.getElementById("resumeBtn").addEventListener("click", togglePause);
+  document.getElementById("quitBtn").addEventListener("click", () => { togglePause(); backToMenu(); });
+  document.getElementById("retryBtn").addEventListener("click", () => startGame(state.mode));
+  document.getElementById("menuBtn").addEventListener("click", backToMenu);
+
+  // Test seam (inert in normal play; only attached with ?sitest in the URL).
+  // Lets automated verification advance questions through the real game path.
+  if(location.search.indexOf("sitest") >= 0){
+    window.__si = {
+      key(){ return state.activeKey; },
+      rounds(){ return state.keyRounds; },
+      lockTarget(){ return state.keyLockTarget; },
+      interval(){ return state.current && state.current.interval; },
+      score(){ return state.score; },
+      streak(){ return state.streak; },
+      lives(){ return state.lives; },
+      running(){ return state.running; },
+      win(){ const o = state.objects.find(o => o.isCorrect && !o.hit); if(o) correctHit(o); },
+      wrong(){ const o = state.objects.find(o => !o.isCorrect && !o.hit); if(o) wrongHit(o); },
+      miss(){ missedCorrect(); }
+    };
+  }
+
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
