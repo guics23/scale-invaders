@@ -219,6 +219,31 @@ const commands = {
     await pointerAt(+x, +y);
     return `${x},${y} (hit: ${hit})`;
   },
+  /* drag <x1> <y1> <x2> <y2> [steps] [ms] — a real press-move-release, in touch or
+     mouse events to match the emulation mode. Needed for the bottom-strip steering:
+     a synthetic pointerdown+up cannot express movement, and the game distinguishes
+     a tap from a drag by distance travelled. */
+  async drag(x1, y1, x2, y2, steps = "12", ms = "300") {
+    const [sx, sy, ex, ey, n, dur] = [+x1, +y1, +x2, +y2, +steps, +ms];
+    const at = i => ({ x: Math.round(sx + (ex - sx) * (i / n)), y: Math.round(sy + (ey - sy) * (i / n)) });
+    if (isTouch) {
+      await send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: sx, y: sy }] });
+      for (let i = 1; i <= n; i++) {
+        await send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [at(i)] });
+        await sleep(dur / n);
+      }
+      await send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    } else {
+      await send("Input.dispatchMouseEvent", { type: "mousePressed", x: sx, y: sy, button: "left", clickCount: 1 });
+      for (let i = 1; i <= n; i++) {
+        const p = at(i);
+        await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: p.x, y: p.y, button: "left", buttons: 1 });
+        await sleep(dur / n);
+      }
+      await send("Input.dispatchMouseEvent", { type: "mouseReleased", x: ex, y: ey, button: "left", clickCount: 1 });
+    }
+    return `${sx},${sy} -> ${ex},${ey} in ${dur}ms`;
+  },
   press: async code => { await keyEvent("keyDown", code); await keyEvent("keyUp", code); return code; },
   hold: async (code, ms = "500") => {
     await keyEvent("keyDown", code); await sleep(+ms); await keyEvent("keyUp", code);

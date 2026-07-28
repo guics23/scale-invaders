@@ -97,6 +97,7 @@ errors -> none
 | `click <selector>` | `querySelector(...).click()`; errors if no match. Bypasses hit-testing — anything covering the element is ignored. |
 | `tap <selector>` | A **real** click at the element's centre, hit-tested. Reports what the pointer actually hit. Use this to answer "can a user reach this?" |
 | `tapxy <x> <y>` | Same, at CSS coordinates — for canvas taps, where there is no element to select. |
+| `drag <x1> <y1> <x2> <y2> [steps] [ms]` | Real press-move-release (touch or mouse to match the mode). Required for steering: the game tells a tap from a drag by distance travelled. |
 | `press <Code>` / `hold <Code> <ms>` | Real key events. `Space` (fire), `ArrowLeft`/`ArrowRight`, `KeyA`/`KeyD` (also move), `Escape` (pause). |
 | `until <expr> [@ms]` | Poll every 50ms until truthy (default 10s). **The way to wait.** |
 | `wait <ms>` | Dumb sleep — only for "let a frame paint". |
@@ -120,7 +121,11 @@ reachable from outside, and there is no way to import a function in node.
 
 Read state: `si key`, `si tonality`, `si rounds`, `si lockTarget`, `si locked`,
 `si noteYs`, `si interval`, `si correctNote`, `si score`, `si streak`,
-`si lives`, `si running`.
+`si lives`, `si running`, `si bullets`, `si shipX`, `si targetX`.
+
+`si bullets` is how you assert a shot happened; `si targetX` is the pending drag
+destination (`null` when idle), which is what proves a drag was speed-capped rather
+than a teleport.
 
 Drive outcomes through the **real** code paths — these call the game's own
 `correctHit` / `wrongHit` / `missedCorrect`:
@@ -249,13 +254,12 @@ you want.
 - **Waiting for the overlay to *hide* right after `click #startArcadeBtn` passes
   instantly** — it hasn't appeared yet. Wait for `contains('show')` first, then
   for its absence.
-- **`viewport w h true` must come before `nav`, and it enables touch for a reason.**
-  The game only shows its `◀ FIRE ▶` footer when
-  `'ontouchstart' in window || navigator.maxTouchPoints > 0`, evaluated at load. With
-  metrics-only emulation the footer stays `display:none` and the canvas grows into
-  its space — a "mobile" screenshot that no phone ever renders. `viewport ... true`
-  now also sets `setTouchEmulationEnabled` + `setEmitTouchEventsForMouse`, and the
-  footer appears (portrait 390x844: footer at y 772-844, canvas 127-772).
+- **`viewport w h true` enables touch emulation, which selects the input path.**
+  `tap`/`tapxy`/`drag` dispatch touch events when it is on and mouse events when it is
+  off, and the two are not interchangeable (see the hang below). The layout no longer
+  depends on it — the old `◀ FIRE ▶` footer, which was gated on
+  `navigator.maxTouchPoints`, is gone — but keep setting it before `nav` when
+  emulating a phone so you exercise the same event path a phone does.
 - **Under touch emulation `Input.dispatchMouseEvent` never acks and the call hangs
   forever** (killed my run at the 2-minute mark). `tap`/`tapxy` switch to
   `Input.dispatchTouchEvent` when `isTouch` is set; if you add pointer input, route
@@ -274,12 +278,19 @@ you want.
   canvas tap neither moves nor fires, and a tap on the pause backdrop resumes.
   Verify control changes with `shipx` before/after (`tapxy` on the canvas must leave
   it unchanged) rather than trusting a screenshot.
-- **The bottom 56px of the canvas is a dead band** (`TAP_DEAD_BAND`) — taps there do
-  nothing, so a thumb aiming at `FIRE` that lands high doesn't pause. It is measured
-  from `canvas.getBoundingClientRect().bottom`, so it moves with the layout: portrait
-  canvas ends at 772 (band 716-772), landscape at 360 (band 304-360, covering the
-  floating `◀ ▶ FIRE` row at 308-352), desktop at 820 (band 764-820). Tapping to pause
-  in a test? Stay well above it — `tapxy 550 600`, not `tapxy 550 800`.
+- **There are no on-screen buttons.** Touch play is a `CONTROL_STRIP` — the bottom
+  **80px** of the canvas, where the ship sits: drag there to steer, tap there to fire,
+  tap anywhere above it to pause. Measured from
+  `canvas.getBoundingClientRect().bottom`, so it tracks the layout (portrait canvas
+  ends 844 → strip 764-844; landscape 360 → 280-360; desktop 820 → 740-820). To pause
+  in a test, stay well above it: `tapxy 550 600`, not `tapxy 550 800`.
+- **A drag sets a target, not a position.** `state.targetX` is a destination the ship
+  closes on at `SHIP_SPEED` (320px/s, the same cap the arrow keys get), so a fast flick
+  leaves the ship behind and it arrives late — verified: a 300px flick in 20ms left the
+  ship 26px along, reaching the target ~900ms later. Don't "fix" that lag; pinning the
+  ship to the finger would restore the instant repositioning that tap-to-teleport had.
+  The target **survives the finger lift** on purpose, and any arrow keypress clears it
+  so the keyboard always wins.
 - **Consecutive tap toggles need >350ms between them.** `tapTogglePause` debounces,
   so a script that taps to pause and immediately taps to resume sees no change —
   insert `wait 400`. This is not a bug to fix; see the ghost click below.

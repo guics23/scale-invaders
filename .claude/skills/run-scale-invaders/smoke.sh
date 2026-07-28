@@ -102,20 +102,36 @@ until getComputedStyle(document.getElementById('startScreen')).display === 'none
 wait 500
 tap #resumeBtn
 until !document.getElementById('app').classList.contains('paused') @1000
-# canvas taps must not fire or move the ship
-shipx
-tapxy 300 500
-wait 400
-tapxy 700 500
-wait 400
-shipx
-si lives
-
-# ---------- dead band along the bottom edge (thumb reaching for FIRE) ----------
-# desktop canvas ends at 820, so 764-820 must be inert and 600 must still pause
+# ---------- the bottom control strip: drag steers, tap fires, above pauses ----------
+# desktop canvas ends at 820, so 740-820 is the strip. A tap there must FIRE, never pause.
+# The countdown blocks firing by design, and the pause tests above froze it mid-tick,
+# so let it finish before asserting anything about bullets.
+until !document.getElementById('keyIntroOverlay').classList.contains('show') @9000
+until __si.locked() === false @2000
+si bullets
 tapxy 550 800
-wait 400
+wait 150
+until __si.bullets() > 0 @1000
 until !document.getElementById('app').classList.contains('paused') @1000
+# a drag sets a target the ship closes on at its own speed — never a teleport
+si shipX
+drag 550 790 200 790 10 300
+until __si.targetX() !== null @1000
+eval JSON.stringify({shipTrailsTarget: Math.abs(__si.shipX() - __si.targetX()) > 0})
+until __si.targetX() === null @5000
+until Math.abs(__si.shipX() - 100) < 6 @1000
+# a fast flick must NOT jump the ship: it is still short of target right afterwards
+drag 200 790 800 790 2 20
+eval JSON.stringify({flickTarget: __si.targetX(), shipStillBehind: __si.shipX() < 400})
+# the keyboard takes over from a pending drag target
+press ArrowLeft
+until __si.targetX() === null @1000
+hold ArrowLeft 300
+press Space
+wait 150
+until __si.bullets() > 0 @1000
+# above the strip still pauses
+wait 400
 tapxy 550 600
 wait 400
 until document.getElementById('app').classList.contains('paused') @1000
@@ -145,15 +161,19 @@ click #startArcadeBtn
 until document.getElementById('keyIntroOverlay').classList.contains('show') @3000
 wait 250
 shot 09-phone-landscape
-# landscape floats ◀ ▶ FIRE inside the canvas; they must fire/steer, not pause
+# landscape: canvas ends at 360, so 280-360 is the strip. Tap fires, drag steers.
 until !document.getElementById('keyIntroOverlay').classList.contains('show') @8000
-tap #fireBtn
-wait 250
+tapxy 370 340
+wait 150
+until __si.bullets() > 0 @1000
 until !document.getElementById('app').classList.contains('paused') @1000
-tapxy 370 330
+drag 370 330 120 330 10 300
+until __si.targetX() !== null @1000
+until __si.targetX() === null @5000
+until Math.abs(__si.shipX() - 120) < 8 @1000
+# above the strip pauses even on the short layout
 wait 400
-until !document.getElementById('app').classList.contains('paused') @1000
-tapxy 370 200
+tapxy 370 150
 wait 400
 until document.getElementById('app').classList.contains('paused') @1000
 

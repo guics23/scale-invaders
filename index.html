@@ -302,22 +302,11 @@
     text-transform:uppercase; color:var(--text-dim);
   }
 
-  /* ---------- footer / mobile controls ---------- */
-  #footerControls{
-    display:flex; align-items:center; justify-content:center; gap:14px;
-    padding:10px 14px calc(10px + env(safe-area-inset-bottom));
-    position:relative; z-index:5;
-  }
-  .mobile-btn{
-    width:60px; height:52px; border-radius:14px;
-    background:var(--bg-panel); color:var(--gold-bright);
-    border:1px solid rgba(139,127,192,.4);
-    font-size:20px; font-weight:700;
-    display:flex; align-items:center; justify-content:center;
-  }
-  .mobile-btn:active{ background:var(--bg-panel2); }
-  #fireBtn{ background:var(--gold); color:#1b1330; width:80px; }
-  #fireBtn:active{ background:var(--gold-bright); }
+  /* Touch play has no buttons: you drag along the bottom strip to steer and tap
+     there to fire (see the pointer handlers). The inset keeps that strip — and the
+     ship sitting in it — clear of the iOS home indicator, which would otherwise
+     swallow drags that start near the bottom edge. */
+  #canvasWrap{ padding-bottom:env(safe-area-inset-bottom); }
 
   /* ---------- game over ---------- */
   #gameOverScreen{
@@ -397,9 +386,7 @@
     .hud-stats{ gap:10px; }
   }
 
-  /* Short landscape phones: reclaim vertical room so notes have space to fall.
-     Trim the chrome and lift the touch controls into the bottom corners of the
-     play area (movement left, fire right) instead of a full footer row. */
+  /* Short landscape phones: reclaim vertical room so notes have space to fall. */
   @media (orientation:landscape) and (max-height:520px){
     #hud{ padding:6px 16px 2px; }
     .hud-left .brand{ font-size:13px; }
@@ -407,19 +394,6 @@
     #questionBanner{ padding:0 16px 3px; }
     .helper-row{ padding-bottom:3px; }
     .helper-note{ padding:2px 7px; }
-    #footerControls{
-      position:absolute; z-index:6;
-      left:0; right:0; bottom:0;
-      justify-content:flex-start; gap:12px;
-      padding:0 16px calc(8px + env(safe-area-inset-bottom));
-      background:none;
-      pointer-events:none;              /* let taps fall through the gaps to the canvas */
-    }
-    #footerControls .mobile-btn{
-      pointer-events:auto;
-      width:56px; height:44px; font-size:18px; opacity:.9;
-    }
-    #footerControls #fireBtn{ width:74px; order:3; margin-left:auto; }  /* both arrows left, fire pushed to the right edge */
     /* keep the whole key intro on screen when there's almost no vertical room */
     .ki-eyebrow{ font-size:clamp(18px,4vh,24px); }
     .ki-count{ font-size:clamp(44px,16vh,80px); }
@@ -466,8 +440,9 @@
     </div>
 
     <p class="instructions">
-      <b>◀ ▶ / A D</b> to move your ship &nbsp;·&nbsp; <b>Space / FIRE</b> to shoot &nbsp;·&nbsp;
-      <b>Tap the play area</b> to pause &nbsp;·&nbsp;
+      <b>◀ ▶ / A D</b> to move, <b>Space</b> to shoot &nbsp;·&nbsp;
+      on touch, <b>drag along the bottom</b> to steer and <b>tap there</b> to shoot &nbsp;·&nbsp;
+      <b>Tap higher up</b> to pause &nbsp;·&nbsp;
       Shoot the correct note before it reaches the bottom. Wrong shots cost points and break your streak; letting the right note fall past you costs a life.
     </p>
   </div>
@@ -517,12 +492,6 @@
   </div>
 
   <!-- ============ FOOTER / MOBILE CONTROLS ============ -->
-  <div id="footerControls" style="display:none;">
-    <button class="mobile-btn" id="leftBtn">◀</button>
-    <button class="mobile-btn" id="fireBtn">FIRE</button>
-    <button class="mobile-btn" id="rightBtn">▶</button>
-  </div>
-
   <!-- ============ PAUSE ============ -->
   <div id="pauseOverlay">
     <h2>Paused</h2>
@@ -738,6 +707,7 @@
     score: 0, streak: 0, bestStreak: 0, lives: 3, level: 0,
     activeKey: null, keyRounds: 0, keyLockTarget: 10, lastIvIdx: null,  // stay in one key for a randomized run
     introTime: 0, introShown: 0,   // key-change countdown intro
+    targetX: null,                 // touch drag destination; null when not dragging
     running: false, paused: false,
     current: null,            // {key, interval, correctNote, correctOctave}
     objects: [],               // falling notes
@@ -758,7 +728,6 @@
     questionBanner: document.getElementById("questionBanner"),
     helperRow: document.getElementById("helperRow"),
     canvasWrap: document.getElementById("canvasWrap"),
-    footerControls: document.getElementById("footerControls"),
     gameOverScreen: document.getElementById("gameOverScreen"),
     pauseOverlay: document.getElementById("pauseOverlay"),
     canvas: document.getElementById("gameCanvas"),
@@ -960,6 +929,7 @@
 
   function ordinal(n){ return n + (["th","st","nd","rd"][(n%100>10&&n%100<14)?0:(n%10<4?n%10:0)]); }
 
+  const SHIP_SPEED = 320;    // px/s — the cap for both arrow steering and touch drags
   const KEY_INTRO_SEC = 3;   // key-change: freeze notes + count down this many seconds
   const KEY_EASE_START = 0.6;  // fall-speed multiplier on the first note of a new key
   const KEY_EASE_NOTES = 3;    // ramp back up to full speed over this many notes
@@ -1209,8 +1179,16 @@
     }
 
     // ship
-    if(keys.left) state.shipX -= 320*dt;
-    if(keys.right) state.shipX += 320*dt;
+    if(keys.left) state.shipX -= SHIP_SPEED*dt;
+    if(keys.right) state.shipX += SHIP_SPEED*dt;
+    // A touch drag sets a target and the ship closes on it at the same speed the
+    // arrow keys give, so dragging is direct but never faster than steering.
+    if(state.targetX !== null){
+      const gap = state.targetX - state.shipX;
+      const step = SHIP_SPEED*dt;
+      if(Math.abs(gap) <= step){ state.shipX = state.targetX; state.targetX = null; }
+      else state.shipX += Math.sign(gap)*step;
+    }
     state.shipX = Math.max(30, Math.min(W-30, state.shipX));
 
     // bullets
@@ -1406,8 +1384,8 @@
   const keys = {left:false, right:false};
   window.addEventListener("keydown", (e) => {
     if(!state.running) return;
-    if(e.code === "ArrowLeft" || e.code === "KeyA") keys.left = true;
-    if(e.code === "ArrowRight" || e.code === "KeyD") keys.right = true;
+    if(e.code === "ArrowLeft" || e.code === "KeyA"){ keys.left = true; state.targetX = null; }
+    if(e.code === "ArrowRight" || e.code === "KeyD"){ keys.right = true; state.targetX = null; }
     if(e.code === "Space"){ e.preventDefault(); fireBullet(); }
     if(e.code === "Escape") togglePause();
   });
@@ -1424,13 +1402,11 @@
      at 320 px/s costs at most ~2.8s across a desktop canvas against ~7s of fall
      time at the fastest level, so getting there in time is a real but fair demand.
 
-     That frees the play area for pause, which mobile otherwise had no easy target
-     for. Tapping the backdrop again resumes, so it toggles like the ❚❚ button.
+     Touch play lives in a strip along the bottom, where the ship sits: drag there to
+     steer, tap there to fire, and tap anywhere above it to pause. Tapping the pause
+     backdrop resumes, so it toggles like the ❚❚ button.
 
-     The guard is load-bearing on touch: one finger tap emits a pointerdown from the
-     touch itself and a second from Chrome's touch→mouse compatibility events. By
-     the time the second arrives the overlay is up, so it would land on the backdrop
-     and resume — pausing and unpausing in a single tap. */
+     The 350ms guard stops one gesture from toggling twice. */
   let lastTapToggle = 0;
   function tapTogglePause(e){
     if(e.cancelable) e.preventDefault();
@@ -1439,45 +1415,67 @@
     lastTapToggle = now;
     togglePause();
   }
-  /* Dead band along the bottom edge: a thumb aiming for FIRE that lands high would
-     otherwise pause instead of shoot. Sized from the real layouts — portrait puts
-     the buttons at 782-834 just below a canvas ending at 772, and landscape floats
-     them at 308-352 *inside* a canvas ending at 360, so they occupy its bottom 52px.
-     56 clears the taller case; taps in the landscape gaps between the corner buttons
-     now do nothing rather than pausing. */
-  const TAP_DEAD_BAND = 56;
+
+  /* CONTROL_STRIP is the bottom band of the canvas that steers instead of pausing.
+     80 covers the ship's full height (it is drawn centred at H-56, hull ±20) with
+     room for a thumb, and doubles as the guard that stops a thumb reaching for the
+     ship from pausing the game. */
+  const CONTROL_STRIP = 80;
+  const TAP_SLOP = 12;      // px of travel still counted as a tap, not a drag
+  const TAP_TIME = 350;     // ms held before a press stops counting as a tap
+  const drag = { active:false, id:null, offset:0, startX:0, startT:0, moved:0 };
+
   el.canvas.addEventListener("pointerdown", (e) => {
     const rect = el.canvas.getBoundingClientRect();
-    if(rect.bottom - e.clientY <= TAP_DEAD_BAND) return;
-    tapTogglePause(e);
+    if(rect.bottom - e.clientY > CONTROL_STRIP){ tapTogglePause(e); return; }
+    if(!state.running || state.paused) return;
+    if(e.cancelable) e.preventDefault();
+    drag.active = true;
+    drag.id = e.pointerId;
+    // Grab by offset, never by jumping the ship to the finger: a jump would be the
+    // instant repositioning that tap-to-teleport used to give.
+    drag.offset = state.shipX - (e.clientX - rect.left);
+    drag.startX = e.clientX;
+    drag.startT = performance.now();
+    drag.moved = 0;
+    state.targetX = state.shipX;
+    try { el.canvas.setPointerCapture(e.pointerId); } catch {}
   });
+  el.canvas.addEventListener("pointermove", (e) => {
+    if(!drag.active || e.pointerId !== drag.id) return;
+    const rect = el.canvas.getBoundingClientRect();
+    drag.moved = Math.max(drag.moved, Math.abs(e.clientX - drag.startX));
+    // A target, not a position — update() closes the gap at the ship's own speed, so
+    // a flick cannot outrun what the arrow keys can do.
+    state.targetX = Math.max(30, Math.min(W-30, (e.clientX - rect.left) + drag.offset));
+  });
+  function endDrag(e){
+    if(!drag.active || (e && e.pointerId !== drag.id)) return;
+    drag.active = false;
+    // The target survives the lift on purpose: a flick sets a destination and the
+    // ship keeps travelling there at its own speed. Clearing it here would make
+    // fast flicks stop short and be wasted motion.
+    const quick = performance.now() - drag.startT < TAP_TIME;
+    if(drag.moved <= TAP_SLOP && quick) fireBullet();   // a press that went nowhere
+    try { el.canvas.releasePointerCapture(drag.id); } catch {}
+    drag.id = null;
+  }
+  el.canvas.addEventListener("pointerup", endDrag);
+  el.canvas.addEventListener("pointercancel", endDrag);
+
   el.pauseOverlay.addEventListener("pointerdown", (e) => {
     if(e.target === el.pauseOverlay) tapTogglePause(e);   // backdrop only, not the buttons
   });
-  /* The pointerdown that opens the overlay is followed by a click at the same
-     point — and the overlay is now under it. Left alone, a tap near the middle
-     lands on Resume (pausing and unpausing in one tap) and a tap slightly lower
-     lands on Quit to menu, throwing the run away. preventDefault() on pointerdown
-     does not stop it, so swallow clicks in the capture phase while the tap that
-     caused them is still in flight; capture beats the buttons' own handlers. */
+  /* The pointerdown that opens the overlay is followed by a click at the same point
+     — and the overlay is now under it. Measured on one tap:
+       ["canvas:pointerdown:touch", "canvas:touchstart", "overlay:click:pauseOverlay"]
+     Left alone that click lands on Resume (pausing and unpausing in one tap) or, a
+     little lower, on Quit to menu, throwing the run away. preventDefault() on
+     pointerdown does not stop it, so swallow clicks in the capture phase while the
+     tap that caused them is still in flight; capture beats the buttons' handlers. */
   el.pauseOverlay.addEventListener("click", (e) => {
     if(performance.now() - lastTapToggle < 350){ e.stopPropagation(); e.preventDefault(); }
   }, true);
-
-  function bindHold(elm, onDown, onUp){
-    elm.addEventListener("pointerdown", (e)=>{ e.preventDefault(); onDown(); });
-    elm.addEventListener("pointerup", onUp);
-    elm.addEventListener("pointerleave", onUp);
-    elm.addEventListener("pointercancel", onUp);
-  }
-  bindHold(document.getElementById("leftBtn"), ()=>keys.left=true, ()=>keys.left=false);
-  bindHold(document.getElementById("rightBtn"), ()=>keys.right=true, ()=>keys.right=false);
-  document.getElementById("fireBtn").addEventListener("pointerdown", (e)=>{ e.preventDefault(); fireBullet(); });
-
-  // show mobile controls on touch devices
-  if(('ontouchstart' in window) || navigator.maxTouchPoints > 0){
-    el.footerControls.style.display = "flex";
-  }
 
   let scaleModalTimer = null;
   function showScaleModal(){
@@ -1502,6 +1500,7 @@
     state.score = 0; state.streak = 0; state.bestStreak = 0; state.lives = 3; state.level = 0;
     state.activeKey = null; state.keyRounds = 0; state.keyLockTarget = 0; state.lastIvIdx = null;
     state.bullets = []; state.particles = []; state.objects = [];
+    state.targetX = null;
     el.startScreen.style.display = "none";
     el.gameOverScreen.style.display = "none";
     el.hud.style.display = "flex";
@@ -1554,6 +1553,9 @@
       lockTarget(){ return state.keyLockTarget; },
       locked(){ return state.questionLock; },
       noteYs(){ return state.objects.filter(o => !o.hit).map(o => Math.round(o.y)); },
+      bullets(){ return state.bullets.length; },
+      shipX(){ return Math.round(state.shipX); },
+      targetX(){ return state.targetX === null ? null : Math.round(state.targetX); },
       interval(){ return state.current && state.current.interval; },
       correctNote(){ return state.current && state.current.correctNote; },
       score(){ return state.score; },
