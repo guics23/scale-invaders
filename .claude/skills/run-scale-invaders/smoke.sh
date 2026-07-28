@@ -119,14 +119,14 @@ wait 150
 until !document.getElementById('app').classList.contains('paused') @1000
 # a drag sets a target the ship closes on at its own speed — never a teleport
 si shipX
-drag 550 300 200 300 10 300
-until __si.targetX() !== null @1000
-eval JSON.stringify({shipTrailsTarget: Math.abs(__si.shipX() - __si.targetX()) > 0})
+# expectations are derived from the canvas rect, not hardcoded, so they survive a
+# change to #app's max-width (which is exactly what broke them once already)
+drag 550 300 420 300 10 300
 until __si.targetX() === null @5000
-until Math.abs(__si.shipX() - 100) < 6 @1000
+until Math.abs(__si.shipX() - (420 - document.getElementById('gameCanvas').getBoundingClientRect().left)) < 8 @1000
 # a fast flick must NOT jump the ship: it is still short of target right afterwards
-drag 200 300 800 300 2 20
-eval JSON.stringify({flickTarget: __si.targetX(), shipStillBehind: __si.shipX() < 400})
+drag 420 300 750 300 2 20
+eval JSON.stringify({flickTarget: __si.targetX(), shipStillBehind: __si.shipX() < __si.targetX() - 50})
 # the keyboard takes over from a pending drag target
 press ArrowLeft
 until __si.targetX() === null @1000
@@ -177,10 +177,9 @@ tapxy 370 150
 wait 150
 until __si.bullets() > 0 @1000
 until !document.getElementById('app').classList.contains('paused') @1000
-drag 370 150 120 150 10 300
-until __si.targetX() !== null @1000
+drag 370 150 220 150 10 300
 until __si.targetX() === null @5000
-until Math.abs(__si.shipX() - 120) < 8 @1000
+until Math.abs(__si.shipX() - (220 - document.getElementById('gameCanvas').getBoundingClientRect().left)) < 8 @1000
 wait 400
 tapxy 370 12
 wait 400

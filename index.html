@@ -57,7 +57,10 @@
   }
   #app{
     position:relative;
-    width:100%; max-width:900px; margin:0 auto;   /* cap play width on desktop */
+    /* Phone-width column everywhere. 430px is the widest mainstream phone (iPhone
+       Pro Max), so a desktop browser shows the same layout a phone does instead of a
+       stretched variant of it — one set of proportions to design and test against. */
+    width:100%; max-width:430px; margin:0 auto;
     height:100vh; height:100dvh;
     display:flex; flex-direction:column;
     background:linear-gradient(180deg, #1a1332 0%, #120c22 100%);
@@ -172,7 +175,9 @@
   .mode-card p{ margin:0; font-size:13px; color:var(--text-dim); line-height:1.5; }
 
   .key-grid{
-    display:grid; grid-template-columns:repeat(4,1fr); gap:6px;
+    /* 3 columns, not 4: the app column is capped at phone width, so this was the
+       only branch of the old max-width:520px media query that ever applied. */
+    display:grid; grid-template-columns:repeat(3,1fr); gap:6px;
     margin:20px 0 4px; width:100%; max-width:520px;
   }
   .key-grid-label{
@@ -218,7 +223,7 @@
     font-family:var(--font-body); font-weight:700; font-size:13px; color:var(--teal);
   }
   .hud-stats{
-    display:flex; gap:14px; font-family:var(--font-mono); font-size:13px;
+    display:flex; gap:10px; font-family:var(--font-mono); font-size:13px;
   }
   .hud-stats .stat{ text-align:center; }
   .hud-stats .stat .v{ font-size:16px; font-weight:700; color:var(--cream); }
@@ -380,11 +385,6 @@
 
   ::-webkit-scrollbar{ width:8px; }
   ::-webkit-scrollbar-thumb{ background:var(--bg-panel2); border-radius:4px; }
-
-  @media (max-width:520px){
-    .key-grid{ grid-template-columns:repeat(3,1fr); }
-    .hud-stats{ gap:10px; }
-  }
 
   /* Short landscape phones: reclaim vertical room so notes have space to fall. */
   @media (orientation:landscape) and (max-height:520px){
