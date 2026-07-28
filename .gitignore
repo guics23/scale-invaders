@@ -1,2 +1,3 @@
-# Claude Code local-only settings (per-machine permission grants)
+# Claude Code local-only settings (per-machine permission grants) and its temp writes
 .claude/settings.local.json
+.claude/settings.local.json.tmp.*
