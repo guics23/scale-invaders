@@ -307,6 +307,17 @@ you want.
   coordinates** — `tapxy 550 410` (Resume) and `tapxy 550 470` (Quit) at 1100x820 —
   a tap at y=200 lands on inert backdrop and passes either way. The smoke script
   covers both.
+- **`#app` is a fixed phone-shaped panel: `max-width:430px`, `max-height:932px`,
+  centred.** So on any viewport bigger than that, the app does NOT start at 0,0 —
+  at 1200x1200 it sits at left 385, top 134. Hardcoded pointer coordinates that
+  assumed a full-window app will miss it entirely (this broke the smoke script once:
+  x=200 and x=800 fell outside the column). Derive coordinates from
+  `document.getElementById('gameCanvas').getBoundingClientRect()` instead. The game's
+  own handlers already do, so input maps correctly however it is letterboxed.
+- **Canvas height varies less than you'd think, and difficulty follows it.** Fall
+  speed is a fixed px/s, so fall distance is difficulty: phone 390x844 → 707px,
+  laptop 1440x900 → 755px, monitor 2560x1440 → 787px. Before `max-height` the last
+  one was 1295px — the same level, 83% more fall time.
 - **One tap emits three events under touch emulation:**
   `canvas:pointerdown:touch`, `canvas:touchstart`, then `overlay:click:<whatever is
   now under the point>`. Worth remembering before assuming "one gesture, one

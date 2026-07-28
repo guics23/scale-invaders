@@ -49,19 +49,26 @@
   *{box-sizing:border-box;}
   html,body{
     margin:0; padding:0; width:100%; height:100%;
-    background:#0c0817;   /* darker than the app panel so the 900px column reads on desktop */
+    background:#0c0817;   /* darker than the app panel so the column reads on desktop */
     font-family:var(--font-body);
     color:var(--cream);
     overflow:hidden;
     -webkit-tap-highlight-color: transparent;
   }
+  /* Centres the phone-shaped panel when the window is bigger than it. */
+  body{ display:flex; align-items:center; justify-content:center; }
   #app{
     position:relative;
     /* Phone-width column everywhere. 430px is the widest mainstream phone (iPhone
        Pro Max), so a desktop browser shows the same layout a phone does instead of a
        stretched variant of it — one set of proportions to design and test against. */
     width:100%; max-width:430px; margin:0 auto;
-    height:100vh; height:100dvh;
+    /* ...and phone-height too. 430x932 is the iPhone Pro Max viewport, so on a tall
+       monitor the panel stays phone-shaped instead of stretching into a strip. That
+       is a fairness fix as much as a cosmetic one: fall speed is a fixed px/s, so an
+       uncapped 1440px-tall column gave 83% more fall distance than a phone — the same
+       level, materially easier. */
+    height:100vh; height:100dvh; max-height:932px;
     display:flex; flex-direction:column;
     background:linear-gradient(180deg, #1a1332 0%, #120c22 100%);
     box-shadow:0 0 60px rgba(0,0,0,.45);          /* delineate the panel on wide screens */
