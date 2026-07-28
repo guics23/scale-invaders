@@ -5,6 +5,29 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Scale Invaders — Learn Your Intervals</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%2214%22%20fill%3D%22%23161029%22%2F%3E%3Cellipse%20cx%3D%2223%22%20cy%3D%2245%22%20rx%3D%2211%22%20ry%3D%228%22%20fill%3D%22%23eab54c%22%2F%3E%3Crect%20x%3D%2232%22%20y%3D%2215%22%20width%3D%224%22%20height%3D%2232%22%20fill%3D%22%23eab54c%22%2F%3E%3Cpath%20d%3D%22M32%2015c14%202%2015%2015%207%2022%206-11-1-18-7-15z%22%20fill%3D%22%23eab54c%22%2F%3E%3C%2Fsvg%3E">
+
+<!-- ============ PWA ============ -->
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#161029">
+<!-- iOS ignores the manifest for these three; it still needs the old meta tags
+     to launch chrome-less and to pick a home-screen icon (it has no SVG support,
+     hence the PNG). Status bar is opaque so the HUD can't slide under a notch. -->
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Scale Invaders">
+<meta name="mobile-web-app-capable" content="yes">
+<script>
+  /* Service workers require http(s) — on file:// register() throws, and opening
+     index.html straight off disk stays a first-class way to run this. So the PWA
+     layer is additive: no worker, no manifest fetch, game unaffected. */
+  if("serviceWorker" in navigator && location.protocol.indexOf("http") === 0){
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("sw.js").catch(() => {});
+    });
+  }
+</script>
+
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Bungee&family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;600;700&display=swap');
 
@@ -244,27 +267,39 @@
   #feedbackOverlay.good{ color:var(--gold-bright); }
   #feedbackOverlay.bad{ color:var(--coral); }
 
-  /* transient key-change banner (flashes on key change) */
-  .flash-banner{
-    position:absolute; left:50%; top:0;
-    transform:translateX(-50%) scale(.96);
-    opacity:0; pointer-events:none; white-space:nowrap; text-align:center;
-    transition:opacity .22s ease, transform .22s ease;
+  /* ---------- key-change intro (full-cover countdown) ---------- */
+  #keyIntroOverlay{
+    position:absolute; inset:0; z-index:22; display:none;
+    flex-direction:column; align-items:center; justify-content:center; gap:6px;
+    /* fully opaque: the HUD and the canvas key/degree watermark ghost through even a
+       1-2% scrim, and a half-visible old key behind the new one is the worst read */
+    background:
+      radial-gradient(circle at 50% 42%, rgba(79,196,176,.10), transparent 60%),
+      linear-gradient(180deg, #1a1332 0%, #120c22 100%);
+    text-align:center; padding:20px; pointer-events:none;
   }
-  .flash-banner.show{ opacity:1; transform:translateX(-50%) scale(1); }
-  #keyChangeBanner{
-    top:11%;
-    width:min(88vw,460px); white-space:normal;
+  #keyIntroOverlay.show{ display:flex; animation:kiFade .18s ease; }
+  @keyframes kiFade{ from{ opacity:0; } to{ opacity:1; } }
+  .ki-eyebrow{
+    font-family:var(--font-display); font-size:clamp(20px,6vw,32px);
+    color:var(--teal); letter-spacing:.06em;
+    text-shadow:0 0 18px rgba(79,196,176,.35);
+  }
+  .ki-key{
     font-family:var(--font-body); font-weight:700;
-    font-size:clamp(15px,4vw,20px); line-height:1.4;
-    color:var(--cream);
-    text-shadow:0 2px 8px rgba(0,0,0,.5);
+    font-size:clamp(17px,4.6vw,24px); color:var(--cream);
   }
-  #keyChangeBanner b{ color:var(--gold-bright); }
-  #keyChangeBanner .cd{
-    display:inline-block; min-width:1.1em;
-    font-family:var(--font-display); font-size:1.5em;
-    color:var(--gold-bright); text-shadow:0 0 14px rgba(234,181,76,.5);
+  .ki-key b{ color:var(--gold-bright); }
+  .ki-count{
+    font-family:var(--font-display);
+    font-size:clamp(64px,20vw,132px); line-height:1.05;
+    color:var(--gold-bright); text-shadow:0 0 28px rgba(234,181,76,.45);
+  }
+  .ki-count.pop{ animation:kiPop .32s ease-out; }
+  @keyframes kiPop{ from{ transform:scale(1.5); opacity:.25; } to{ transform:scale(1); opacity:1; } }
+  .ki-sub{
+    font-family:var(--font-mono); font-size:12px; letter-spacing:.14em;
+    text-transform:uppercase; color:var(--text-dim);
   }
 
   /* ---------- footer / mobile controls ---------- */
@@ -299,12 +334,34 @@
   }
   #gameOverScreen .final-stats b{ color:var(--gold-bright); font-size:18px; }
 
+  /* Pause is a light scrim on purpose: pausing is when you want to study the
+     staff — clef, key signature, where the notes sit — so it must stay readable
+     through the overlay. Legibility of the pause text comes from its own shadow,
+     not from darkening the play area. */
   #pauseOverlay{
     position:absolute; inset:0; z-index:24; display:none;
     align-items:center; justify-content:center; flex-direction:column; gap:14px;
-    background:rgba(15,10,28,.85);
+    background:rgba(15,10,28,.42);
   }
-  #pauseOverlay h2{ font-family:var(--font-display); color:var(--cream); font-size:28px; margin:0; }
+  #pauseOverlay h2{
+    font-family:var(--font-display); color:var(--cream); font-size:28px; margin:0;
+    text-shadow:0 2px 10px rgba(12,8,23,.95), 0 0 24px rgba(12,8,23,.8);
+  }
+  /* ...and the opaque key-change intro steps out of the way while paused, or
+     there'd be nothing to study behind it. The countdown itself is untouched —
+     it resumes mid-tick with the loop. */
+  #app.paused #keyIntroOverlay{ background:none; }
+  #app.paused #keyIntroOverlay > *{ visibility:hidden; }
+
+  /* While the countdown is up, lift the HUD above the intro overlay so the peek
+     and pause buttons stay visible and tappable — the overlay is
+     pointer-events:none, so they worked before, but blind. #hud is its own
+     stacking context (position + z-index), so a z-index on .hud-right alone
+     can't escape it; the rest of the HUD is hidden instead, keeping the
+     countdown the only thing you read. Pausing brings the whole HUD back. */
+  #app.key-intro #hud{ z-index:23; }
+  #app.key-intro:not(.paused) .hud-left,
+  #app.key-intro:not(.paused) .hud-stats{ visibility:hidden; }
 
   /* ---------- scale peek modal ---------- */
   #scaleModal{
@@ -363,6 +420,9 @@
       width:56px; height:44px; font-size:18px; opacity:.9;
     }
     #footerControls #fireBtn{ width:74px; order:3; margin-left:auto; }  /* both arrows left, fire pushed to the right edge */
+    /* keep the whole key intro on screen when there's almost no vertical room */
+    .ki-eyebrow{ font-size:clamp(18px,4vh,24px); }
+    .ki-count{ font-size:clamp(44px,16vh,80px); }
   }
 </style>
 </head>
@@ -406,7 +466,8 @@
     </div>
 
     <p class="instructions">
-      <b>◀ ▶ / A D</b> to move your ship &nbsp;·&nbsp; <b>Space / Tap</b> to fire &nbsp;·&nbsp;
+      <b>◀ ▶ / A D</b> to move your ship &nbsp;·&nbsp; <b>Space / FIRE</b> to shoot &nbsp;·&nbsp;
+      <b>Tap the play area</b> to pause &nbsp;·&nbsp;
       Shoot the correct note before it reaches the bottom. Wrong shots cost points and break your streak; letting the right note fall past you costs a life.
     </p>
   </div>
@@ -444,8 +505,15 @@
   <!-- ============ GAME CANVAS ============ -->
   <div id="canvasWrap" style="display:none;">
     <canvas id="gameCanvas"></canvas>
-    <div id="keyChangeBanner" class="flash-banner"></div>
     <div id="feedbackOverlay"></div>
+  </div>
+
+  <!-- ============ KEY CHANGE INTRO ============ -->
+  <div id="keyIntroOverlay" role="status">
+    <div class="ki-eyebrow">Get ready!</div>
+    <div class="ki-key">Key of <b id="keyIntroKey">C Major</b> is coming in</div>
+    <div class="ki-count" id="keyIntroCount" aria-hidden="true">3</div>
+    <div class="ki-sub" id="keyIntroSig">no sharps or flats</div>
   </div>
 
   <!-- ============ FOOTER / MOBILE CONTROLS ============ -->
@@ -614,6 +682,14 @@
     {minScore:500, keys:ARCADE_KEYS.slice(),                          intervals:[0,1,2,3,4,5],   objects:5, speed:84},
     {minScore:720, keys:ARCADE_KEYS.slice(),                          intervals:[0,1,2,3,4,5],   objects:6, speed:98}
   ];
+  /* Asymmetry on purpose: C Major is excluded from arcade, but its relative minor
+     (A Minor) is not. An empty key signature makes C Major trivial because everyone
+     drills it; A Minor is far less practised, so it earns its place in every pool. */
+  function minorPoolFor(lvl){
+    const keys = lvl.keys.map(k => REL_MINOR[k]);
+    if(!keys.includes(REL_MINOR["C"])) keys.unshift(REL_MINOR["C"]);
+    return keys;
+  }
   function levelForScore(score){
     let idx = 0;
     for(let i=0;i<LEVELS.length;i++){ if(score >= LEVELS[i].minScore) idx = i; }
@@ -661,7 +737,7 @@
     practiceKeys: KEY_ORDER.slice(),
     score: 0, streak: 0, bestStreak: 0, lives: 3, level: 0,
     activeKey: null, keyRounds: 0, keyLockTarget: 10, lastIvIdx: null,  // stay in one key for a randomized run
-    introTime: 0, introLabel: "", introShown: 0,   // key-change countdown intro
+    introTime: 0, introShown: 0,   // key-change countdown intro
     running: false, paused: false,
     current: null,            // {key, interval, correctNote, correctOctave}
     objects: [],               // falling notes
@@ -676,6 +752,7 @@
      DOM REFS
      ========================================================= */
   const el = {
+    app: document.getElementById("app"),
     startScreen: document.getElementById("startScreen"),
     hud: document.getElementById("hud"),
     questionBanner: document.getElementById("questionBanner"),
@@ -686,7 +763,10 @@
     pauseOverlay: document.getElementById("pauseOverlay"),
     canvas: document.getElementById("gameCanvas"),
     feedbackOverlay: document.getElementById("feedbackOverlay"),
-    keyChangeBanner: document.getElementById("keyChangeBanner"),
+    keyIntroOverlay: document.getElementById("keyIntroOverlay"),
+    keyIntroKey: document.getElementById("keyIntroKey"),
+    keyIntroCount: document.getElementById("keyIntroCount"),
+    keyIntroSig: document.getElementById("keyIntroSig"),
     keyNameLabel: document.getElementById("keyNameLabel"),
     targetIntervalLabel: document.getElementById("targetIntervalLabel"),
     scoreVal: document.getElementById("scoreVal"),
@@ -859,7 +939,7 @@
     }
     const lvl = LEVELS[state.level];
     // level pools are defined by major key; map to relative minor when in minor mode
-    const keys = state.tonality === "minor" ? lvl.keys.map(k => REL_MINOR[k]) : lvl.keys;
+    const keys = state.tonality === "minor" ? minorPoolFor(lvl) : lvl.keys;
     return {keys, intervalIdx:lvl.intervals, objects:lvl.objects, speed:lvl.speed};
   }
 
@@ -883,8 +963,29 @@
   const KEY_INTRO_SEC = 3;   // key-change: freeze notes + count down this many seconds
   const KEY_EASE_START = 0.6;  // fall-speed multiplier on the first note of a new key
   const KEY_EASE_NOTES = 3;    // ramp back up to full speed over this many notes
-  function introText(label, n){
-    return "Changing to the key of <b>" + label + "</b> in <span class=\"cd\">" + n + "</span>";
+  // "3 sharps" / "2 flats" / "no sharps or flats" — a nudge while the notes are held
+  function sigLabel(key){
+    const sig = sigFor(key);
+    if(!sig || !sig.type) return "no sharps or flats";
+    return sig.count + " " + sig.type + (sig.count === 1 ? "" : "s");
+  }
+  function showKeyIntro(key, n){
+    el.keyIntroKey.textContent = keyDisplayName(key);
+    el.keyIntroSig.textContent = sigLabel(key);
+    el.keyIntroOverlay.classList.add("show");
+    el.app.classList.add("key-intro");     // lifts the HUD buttons over the overlay
+    setIntroCount(n);
+  }
+  function setIntroCount(n){
+    el.keyIntroCount.textContent = n;
+    if(reduceMotion) return;
+    el.keyIntroCount.classList.remove("pop");
+    void el.keyIntroCount.offsetWidth;      // restart the pop animation on each tick
+    el.keyIntroCount.classList.add("pop");
+  }
+  function hideKeyIntro(){
+    el.keyIntroOverlay.classList.remove("show");
+    el.app.classList.remove("key-intro");
   }
 
   function newQuestion(){
@@ -958,16 +1059,15 @@
     el.scaleModalIv.textContent = interval.name;
     hideScaleModal();
 
-    // On a key change, hold the falling notes and count down "…in 3, 2, 1" so the
-    // player can adjust to the new key before the notes drop. The countdown is driven
-    // by the game loop (update), so it pauses correctly with the game.
+    // On a key change, hold the falling notes and count down "3, 2, 1" behind a
+    // full-cover overlay so the player can reset to the new key before the notes drop.
+    // The countdown is driven by the game loop (update), so it pauses with the game.
     if(keyChanged){
       state.questionLock = true;                 // freeze note motion during the intro
       state.introTime = KEY_INTRO_SEC;
-      state.introLabel = keyDisplayName(key);
       state.introShown = KEY_INTRO_SEC;
-      el.keyChangeBanner.innerHTML = introText(state.introLabel, KEY_INTRO_SEC);
-      el.keyChangeBanner.classList.add("show");
+      state.bullets = [];                        // nothing in flight can hit a hidden note
+      showKeyIntro(key, KEY_INTRO_SEC);
     }
   }
 
@@ -995,7 +1095,7 @@
 
   function hideBanners(){
     state.introTime = 0;
-    el.keyChangeBanner.classList.remove("show");
+    hideKeyIntro();
   }
 
   function spawnParticles(x,y,color,count){
@@ -1063,6 +1163,7 @@
   }
 
   function fireBullet(){
+    if(state.introTime > 0) return;   // the intro overlay hides the notes — no blind shots
     const now = performance.now();
     if(now - state.lastFire < 230) return;
     state.lastFire = now;
@@ -1097,12 +1198,12 @@
       if(state.introTime <= 0){
         state.introTime = 0;
         state.questionLock = false;
-        el.keyChangeBanner.classList.remove("show");
+        hideKeyIntro();
       } else {
         const n = Math.ceil(state.introTime);
         if(n !== state.introShown){
           state.introShown = n;
-          el.keyChangeBanner.innerHTML = introText(state.introLabel, n);
+          setIntroCount(n);
         }
       }
     }
@@ -1315,19 +1416,53 @@
     if(e.code === "ArrowRight" || e.code === "KeyD") keys.right = false;
   });
 
+  /* The play area is a display, not a control surface. Steering is the arrows
+     (◀ ▶ / A D or the on-screen buttons) and shooting is Space / FIRE — nothing
+     else. Tapping a note used to teleport the ship there and shoot in one action,
+     which skipped the traverse entirely: with no travel time the level speed ramp
+     (46 → 98 px/s) stopped mattering and only recognition was ever tested. Moving
+     at 320 px/s costs at most ~2.8s across a desktop canvas against ~7s of fall
+     time at the fastest level, so getting there in time is a real but fair demand.
+
+     That frees the play area for pause, which mobile otherwise had no easy target
+     for. Tapping the backdrop again resumes, so it toggles like the ❚❚ button.
+
+     The guard is load-bearing on touch: one finger tap emits a pointerdown from the
+     touch itself and a second from Chrome's touch→mouse compatibility events. By
+     the time the second arrives the overlay is up, so it would land on the backdrop
+     and resume — pausing and unpausing in a single tap. */
+  let lastTapToggle = 0;
+  function tapTogglePause(e){
+    if(e.cancelable) e.preventDefault();
+    const now = performance.now();
+    if(now - lastTapToggle < 350) return;
+    lastTapToggle = now;
+    togglePause();
+  }
+  /* Dead band along the bottom edge: a thumb aiming for FIRE that lands high would
+     otherwise pause instead of shoot. Sized from the real layouts — portrait puts
+     the buttons at 782-834 just below a canvas ending at 772, and landscape floats
+     them at 308-352 *inside* a canvas ending at 360, so they occupy its bottom 52px.
+     56 clears the taller case; taps in the landscape gaps between the corner buttons
+     now do nothing rather than pausing. */
+  const TAP_DEAD_BAND = 56;
   el.canvas.addEventListener("pointerdown", (e) => {
-    if(!state.running) return;
     const rect = el.canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    state.shipX = Math.max(30, Math.min(W-30, x));
-    fireBullet();
+    if(rect.bottom - e.clientY <= TAP_DEAD_BAND) return;
+    tapTogglePause(e);
   });
-  el.canvas.addEventListener("pointermove", (e) => {
-    if(!state.running || e.buttons !== 1) return;
-    const rect = el.canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    state.shipX = Math.max(30, Math.min(W-30, x));
+  el.pauseOverlay.addEventListener("pointerdown", (e) => {
+    if(e.target === el.pauseOverlay) tapTogglePause(e);   // backdrop only, not the buttons
   });
+  /* The pointerdown that opens the overlay is followed by a click at the same
+     point — and the overlay is now under it. Left alone, a tap near the middle
+     lands on Resume (pausing and unpausing in one tap) and a tap slightly lower
+     lands on Quit to menu, throwing the run away. preventDefault() on pointerdown
+     does not stop it, so swallow clicks in the capture phase while the tap that
+     caused them is still in flight; capture beats the buttons' own handlers. */
+  el.pauseOverlay.addEventListener("click", (e) => {
+    if(performance.now() - lastTapToggle < 350){ e.stopPropagation(); e.preventDefault(); }
+  }, true);
 
   function bindHold(elm, onDown, onUp){
     elm.addEventListener("pointerdown", (e)=>{ e.preventDefault(); onDown(); });
@@ -1377,6 +1512,7 @@
     updateHUD();
     newQuestion();
     state.running = true; state.paused = false;
+    el.app.classList.remove("paused");
     lastT = performance.now();
   }
 
@@ -1384,6 +1520,7 @@
     if(!state.running) return;
     state.paused = !state.paused;
     if(state.paused){ hideScaleModal(); }   // keep the key-change countdown; it freezes with the loop
+    el.app.classList.toggle("paused", state.paused);   // uncovers the staff (see CSS)
     el.pauseOverlay.style.display = state.paused ? "flex" : "none";
   }
 
