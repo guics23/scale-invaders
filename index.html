@@ -1285,11 +1285,15 @@
     ctx.strokeStyle = "#f4eddc";
     ctx.lineWidth = 2;
     ctx.stroke();
-    // label
-    ctx.font = "700 13px 'IBM Plex Mono', monospace";
+    /* Label. Bigger than it looks like it should be, and safe: notes spawn 46px
+       apart vertically (y = -40 - lane*46) and all fall at one speed, so lanes stay
+       a permanent diagonal cascade and two labels are never side by side. The only
+       clearance that matters is against this note's own head — hence the baseline
+       moved down with the font, keeping ~5px between cap top and the notehead. */
+    ctx.font = "700 18px 'IBM Plex Mono', monospace";
     ctx.fillStyle = "#eab54c";
     ctx.textAlign = "center";
-    ctx.fillText(o.note, o.x, o.y+22);
+    ctx.fillText(o.note, o.x, o.y+26);
   }
 
   function draw(){
