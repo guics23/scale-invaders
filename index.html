@@ -26,7 +26,7 @@
   *{box-sizing:border-box;}
   html,body{
     margin:0; padding:0; width:100%; height:100%;
-    background:var(--bg-deep);
+    background:#0c0817;   /* darker than the app panel so the 900px column reads on desktop */
     font-family:var(--font-body);
     color:var(--cream);
     overflow:hidden;
@@ -34,9 +34,11 @@
   }
   #app{
     position:relative;
-    width:100vw; height:100vh; height:100dvh;
+    width:100%; max-width:900px; margin:0 auto;   /* cap play width on desktop */
+    height:100vh; height:100dvh;
     display:flex; flex-direction:column;
     background:linear-gradient(180deg, #1a1332 0%, #120c22 100%);
+    box-shadow:0 0 60px rgba(0,0,0,.45);          /* delineate the panel on wide screens */
   }
 
   /* ---------- shared bits ---------- */
@@ -251,12 +253,18 @@
   }
   .flash-banner.show{ opacity:1; transform:translateX(-50%) scale(1); }
   #keyChangeBanner{
-    top:12%;
-    font-family:var(--font-display);
-    font-size:clamp(20px,5.2vw,34px);
-    color:var(--gold-bright);
-    text-shadow:0 0 18px rgba(234,181,76,.5), 0 3px 0 #6b3f1a;
-    letter-spacing:.02em;
+    top:11%;
+    width:min(88vw,460px); white-space:normal;
+    font-family:var(--font-body); font-weight:700;
+    font-size:clamp(15px,4vw,20px); line-height:1.4;
+    color:var(--cream);
+    text-shadow:0 2px 8px rgba(0,0,0,.5);
+  }
+  #keyChangeBanner b{ color:var(--gold-bright); }
+  #keyChangeBanner .cd{
+    display:inline-block; min-width:1.1em;
+    font-family:var(--font-display); font-size:1.5em;
+    color:var(--gold-bright); text-shadow:0 0 14px rgba(234,181,76,.5);
   }
 
   /* ---------- footer / mobile controls ---------- */
@@ -653,6 +661,7 @@
     practiceKeys: KEY_ORDER.slice(),
     score: 0, streak: 0, bestStreak: 0, lives: 3, level: 0,
     activeKey: null, keyRounds: 0, keyLockTarget: 10, lastIvIdx: null,  // stay in one key for a randomized run
+    introTime: 0, introLabel: "", introShown: 0,   // key-change countdown intro
     running: false, paused: false,
     current: null,            // {key, interval, correctNote, correctOctave}
     objects: [],               // falling notes
@@ -871,8 +880,16 @@
 
   function ordinal(n){ return n + (["th","st","nd","rd"][(n%100>10&&n%100<14)?0:(n%10<4?n%10:0)]); }
 
+  const KEY_INTRO_SEC = 3;   // key-change: freeze notes + count down this many seconds
+  const KEY_EASE_START = 0.6;  // fall-speed multiplier on the first note of a new key
+  const KEY_EASE_NOTES = 3;    // ramp back up to full speed over this many notes
+  function introText(label, n){
+    return "Changing to the key of <b>" + label + "</b> in <span class=\"cd\">" + n + "</span>";
+  }
+
   function newQuestion(){
     state.questionLock = false;
+    state.introTime = 0;
     const pool = currentPool();
 
     // sticky key: reuse the current key for a randomized run of questions (8–12),
@@ -928,11 +945,12 @@
     el.keyNameLabel.textContent = "Key of " + keyDisplayName(key);
     el.targetIntervalLabel.textContent = interval.name;
 
-    // scale reference — populated here but only revealed as a brief modal peek
+    // scale reference — shown only as a brief modal peek. Note: the target degree is
+    // NOT highlighted, so the peek shows the scale but you still work out the interval.
     el.helperRow.innerHTML = "";
     scale.forEach((note, i) => {
       const d = document.createElement("div");
-      d.className = "helper-note" + (i===correctIndex ? " target" : "");
+      d.className = "helper-note";
       d.innerHTML = "<b>"+(i+1)+"</b>"+note;
       el.helperRow.appendChild(d);
     });
@@ -940,9 +958,17 @@
     el.scaleModalIv.textContent = interval.name;
     hideScaleModal();
 
-    // announce a key change (the target degree is drawn as a persistent
-    // center-of-screen aid in draw(), so your eyes stay on the falling notes)
-    if(keyChanged) flashBanner(el.keyChangeBanner, "Key of " + keyDisplayName(key), 1800);
+    // On a key change, hold the falling notes and count down "…in 3, 2, 1" so the
+    // player can adjust to the new key before the notes drop. The countdown is driven
+    // by the game loop (update), so it pauses correctly with the game.
+    if(keyChanged){
+      state.questionLock = true;                 // freeze note motion during the intro
+      state.introTime = KEY_INTRO_SEC;
+      state.introLabel = keyDisplayName(key);
+      state.introShown = KEY_INTRO_SEC;
+      el.keyChangeBanner.innerHTML = introText(state.introLabel, KEY_INTRO_SEC);
+      el.keyChangeBanner.classList.add("show");
+    }
   }
 
   /* =========================================================
@@ -967,14 +993,8 @@
     showFeedback._t = setTimeout(()=>{ el.feedbackOverlay.className = ""; }, dur || 900);
   }
 
-  function flashBanner(elm, text, dur){
-    elm.textContent = text;
-    elm.classList.add("show");
-    clearTimeout(elm._t);
-    elm._t = setTimeout(()=>{ elm.classList.remove("show"); }, dur);
-  }
   function hideBanners(){
-    clearTimeout(el.keyChangeBanner._t);
+    state.introTime = 0;
     el.keyChangeBanner.classList.remove("show");
   }
 
@@ -1024,12 +1044,12 @@
     state.lives -= 1;
     playLifeLost();
     // hold the "It was X" message longer so it's readable before moving on
-    showFeedback("Missed! It was " + state.current.correctNote, false, 1300);
+    showFeedback("Missed! It was " + state.current.correctNote, false, 2200);
     updateHUD();
     state.objects.forEach(o => o.hit = true);
     state.questionLock = true;
-    if(state.lives <= 0){ setTimeout(endGame, 1300); }
-    else setTimeout(() => { if(state.running && !state.paused) newQuestion(); }, 1400);
+    if(state.lives <= 0){ setTimeout(endGame, 2200); }
+    else setTimeout(() => { if(state.running && !state.paused) newQuestion(); }, 2300);
   }
 
   function endGame(){
@@ -1065,7 +1085,27 @@
 
   function update(dt){
     const pool = currentPool();
-    const fallSpeed = state.mode==="arcade" ? LEVELS[state.level].speed : pool.speed;
+    const baseSpeed = state.mode==="arcade" ? LEVELS[state.level].speed : pool.speed;
+    // ease-in: after a key change, notes fall slower for the first few notes, then ramp
+    // to full speed — so a brand-new key is never also the fastest you've seen
+    const ease = Math.min(1, KEY_EASE_START + (state.keyRounds - 1) * (1 - KEY_EASE_START) / KEY_EASE_NOTES);
+    const fallSpeed = baseSpeed * ease;
+
+    // key-change intro countdown (notes stay frozen via questionLock until it ends)
+    if(state.introTime > 0){
+      state.introTime -= Math.max(0, dt);   // guard against a negative first-frame dt
+      if(state.introTime <= 0){
+        state.introTime = 0;
+        state.questionLock = false;
+        el.keyChangeBanner.classList.remove("show");
+      } else {
+        const n = Math.ceil(state.introTime);
+        if(n !== state.introShown){
+          state.introShown = n;
+          el.keyChangeBanner.innerHTML = introText(state.introLabel, n);
+        }
+      }
+    }
 
     // ship
     if(keys.left) state.shipX -= 320*dt;
@@ -1343,7 +1383,7 @@
   function togglePause(){
     if(!state.running) return;
     state.paused = !state.paused;
-    if(state.paused){ hideScaleModal(); hideBanners(); }
+    if(state.paused){ hideScaleModal(); }   // keep the key-change countdown; it freezes with the loop
     el.pauseOverlay.style.display = state.paused ? "flex" : "none";
   }
 
@@ -1375,6 +1415,8 @@
       tonality(){ return state.tonality; },
       rounds(){ return state.keyRounds; },
       lockTarget(){ return state.keyLockTarget; },
+      locked(){ return state.questionLock; },
+      noteYs(){ return state.objects.filter(o => !o.hit).map(o => Math.round(o.y)); },
       interval(){ return state.current && state.current.interval; },
       correctNote(){ return state.current && state.current.correctNote; },
       score(){ return state.score; },
