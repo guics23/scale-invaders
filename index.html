@@ -230,7 +230,7 @@
   .hud-right{ display:flex; align-items:center; gap:10px; }
   .icon-btn{
     background:var(--bg-panel); color:var(--cream); border:1px solid rgba(139,127,192,.4);
-    border-radius:8px; width:34px; height:34px; font-size:15px; display:flex; align-items:center; justify-content:center;
+    border-radius:8px; width:44px; height:44px; font-size:16px; display:flex; align-items:center; justify-content:center;
   }
 
   #questionBanner{
@@ -441,8 +441,8 @@
 
     <p class="instructions">
       <b>◀ ▶ / A D</b> to move, <b>Space</b> to shoot &nbsp;·&nbsp;
-      on touch, <b>drag along the bottom</b> to steer and <b>tap there</b> to shoot &nbsp;·&nbsp;
-      <b>Tap higher up</b> to pause &nbsp;·&nbsp;
+      on touch, <b>drag anywhere</b> to steer and <b>tap</b> to shoot &nbsp;·&nbsp;
+      <b>Tap the top bar</b> to pause &nbsp;·&nbsp;
       Shoot the correct note before it reaches the bottom. Wrong shots cost points and break your streak; letting the right note fall past you costs a life.
     </p>
   </div>
@@ -1402,11 +1402,14 @@
      at 320 px/s costs at most ~2.8s across a desktop canvas against ~7s of fall
      time at the fastest level, so getting there in time is a real but fair demand.
 
-     Touch play lives in a strip along the bottom, where the ship sits: drag there to
-     steer, tap there to fire, and tap anywhere above it to pause. Tapping the pause
-     backdrop resumes, so it toggles like the ❚❚ button.
+     Touch play owns the WHOLE play area: drag anywhere to steer, tap anywhere to
+     fire. It started as a strip along the bottom with taps above it pausing, but on
+     a real phone that fought itself — you hold your thumb high to keep clear of the
+     iPhone home bar, and every drag or shot from there paused the game instead. A
+     control surface you have to aim at is not a control surface, so pause moved off
+     the play area entirely (see the HUD handler below).
 
-     The 350ms guard stops one gesture from toggling twice. */
+     The 350ms guard stops one gesture from toggling pause twice. */
   let lastTapToggle = 0;
   function tapTogglePause(e){
     if(e.cancelable) e.preventDefault();
@@ -1416,19 +1419,13 @@
     togglePause();
   }
 
-  /* CONTROL_STRIP is the bottom band of the canvas that steers instead of pausing.
-     80 covers the ship's full height (it is drawn centred at H-56, hull ±20) with
-     room for a thumb, and doubles as the guard that stops a thumb reaching for the
-     ship from pausing the game. */
-  const CONTROL_STRIP = 80;
   const TAP_SLOP = 12;      // px of travel still counted as a tap, not a drag
   const TAP_TIME = 350;     // ms held before a press stops counting as a tap
   const drag = { active:false, id:null, offset:0, startX:0, startT:0, moved:0 };
 
   el.canvas.addEventListener("pointerdown", (e) => {
-    const rect = el.canvas.getBoundingClientRect();
-    if(rect.bottom - e.clientY > CONTROL_STRIP){ tapTogglePause(e); return; }
     if(!state.running || state.paused) return;
+    const rect = el.canvas.getBoundingClientRect();
     if(e.cancelable) e.preventDefault();
     drag.active = true;
     drag.id = e.pointerId;
@@ -1463,6 +1460,15 @@
   el.canvas.addEventListener("pointerup", endDrag);
   el.canvas.addEventListener("pointercancel", endDrag);
 
+  /* Pause target: the top bar. It is a big, full-width strip (~99px tall in portrait,
+     where the HUD wraps to two rows) that your thumb never visits while playing, so it
+     cannot be hit by accident the way the play area could. The ❚❚ button inside it
+     still works on its own; taps that land on a button are left to that button. */
+  el.hud.addEventListener("pointerdown", (e) => {
+    if(!state.running) return;
+    if(e.target.closest("button")) return;
+    tapTogglePause(e);
+  });
   el.pauseOverlay.addEventListener("pointerdown", (e) => {
     if(e.target === el.pauseOverlay) tapTogglePause(e);   // backdrop only, not the buttons
   });

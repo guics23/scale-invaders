@@ -278,12 +278,16 @@ you want.
   canvas tap neither moves nor fires, and a tap on the pause backdrop resumes.
   Verify control changes with `shipx` before/after (`tapxy` on the canvas must leave
   it unchanged) rather than trusting a screenshot.
-- **There are no on-screen buttons.** Touch play is a `CONTROL_STRIP` — the bottom
-  **80px** of the canvas, where the ship sits: drag there to steer, tap there to fire,
-  tap anywhere above it to pause. Measured from
-  `canvas.getBoundingClientRect().bottom`, so it tracks the layout (portrait canvas
-  ends 844 → strip 764-844; landscape 360 → 280-360; desktop 820 → 740-820). To pause
-  in a test, stay well above it: `tapxy 550 600`, not `tapxy 550 800`.
+- **There are no on-screen buttons, and the whole play area is the control surface.**
+  Drag anywhere on the canvas to steer, tap anywhere on it to fire. Nothing on the
+  canvas pauses. This replaced an 80px bottom strip that failed on a real phone: you
+  hold your thumb high to stay clear of the iPhone home bar, and every drag or shot
+  from there paused instead. If you are asserting "does not pause", tap **high** —
+  `tapxy 550 300` — because a bottom-edge tap would have passed under the old design.
+- **Pause is on the top bar.** `#hud` toggles pause on `pointerdown` unless the target
+  is inside a `button`, so `?` and `❚❚` keep their own behaviour. In tests: `tapxy 400 30`
+  (desktop), `tapxy 280 30` (portrait, HUD is 0-109 because it wraps to two rows),
+  `tapxy 370 12` (short landscape). `Escape` and the `❚❚` button still work.
 - **A drag sets a target, not a position.** `state.targetX` is a destination the ship
   closes on at `SHIP_SPEED` (320px/s, the same cap the arrow keys get), so a fast flick
   leaves the ship behind and it arrives late — verified: a 300px flick in 20ms left the

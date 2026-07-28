@@ -83,7 +83,7 @@ until document.getElementById('keyIntroOverlay').classList.contains('show') @100
 # A tap that opens the overlay is followed by a click at the same point, landing on
 # whatever pause button appeared there. Tap ON the Resume/Quit coordinates: if the
 # capture-phase swallow regresses, the run resumes or quits to menu instead.
-tapxy 550 410
+tapxy 400 30
 until document.getElementById('app').classList.contains('paused') @1000
 eval JSON.stringify({resumeTop:Math.round(document.getElementById('resumeBtn').getBoundingClientRect().top),quitTop:Math.round(document.getElementById('quitBtn').getBoundingClientRect().top)})
 until __si.running() @1000
@@ -92,9 +92,9 @@ shot 06-tap-paused
 wait 400
 tapxy 550 200
 until !document.getElementById('app').classList.contains('paused') @1000
-# tap right on Quit's coordinates — must still be in the game afterwards
+# tap the top bar again — must still be in the game afterwards
 wait 400
-tapxy 550 470
+tapxy 400 30
 until document.getElementById('app').classList.contains('paused') @1000
 until __si.running() @1000
 until getComputedStyle(document.getElementById('startScreen')).display === 'none' @1000
@@ -102,26 +102,30 @@ until getComputedStyle(document.getElementById('startScreen')).display === 'none
 wait 500
 tap #resumeBtn
 until !document.getElementById('app').classList.contains('paused') @1000
-# ---------- the bottom control strip: drag steers, tap fires, above pauses ----------
-# desktop canvas ends at 820, so 740-820 is the strip. A tap there must FIRE, never pause.
+# ---------- the whole play area steers and fires; nothing on it pauses ----------
 # The countdown blocks firing by design, and the pause tests above froze it mid-tick,
 # so let it finish before asserting anything about bullets.
 until !document.getElementById('keyIntroOverlay').classList.contains('show') @9000
 until __si.locked() === false @2000
 si bullets
-tapxy 550 800
+# a tap high up on the canvas — where a thumb rests, clear of the iPhone home bar —
+# must fire and must NOT pause (this is the bug the phone test found)
+tapxy 550 300
 wait 150
 until __si.bullets() > 0 @1000
 until !document.getElementById('app').classList.contains('paused') @1000
+tapxy 550 800
+wait 150
+until !document.getElementById('app').classList.contains('paused') @1000
 # a drag sets a target the ship closes on at its own speed — never a teleport
 si shipX
-drag 550 790 200 790 10 300
+drag 550 300 200 300 10 300
 until __si.targetX() !== null @1000
 eval JSON.stringify({shipTrailsTarget: Math.abs(__si.shipX() - __si.targetX()) > 0})
 until __si.targetX() === null @5000
 until Math.abs(__si.shipX() - 100) < 6 @1000
 # a fast flick must NOT jump the ship: it is still short of target right afterwards
-drag 200 790 800 790 2 20
+drag 200 300 800 300 2 20
 eval JSON.stringify({flickTarget: __si.targetX(), shipStillBehind: __si.shipX() < 400})
 # the keyboard takes over from a pending drag target
 press ArrowLeft
@@ -130,14 +134,20 @@ hold ArrowLeft 300
 press Space
 wait 150
 until __si.bullets() > 0 @1000
-# above the strip still pauses
+# pause lives on the top bar now (desktop HUD is ~0-60)
 wait 400
-tapxy 550 600
+tapxy 400 30
 wait 400
 until document.getElementById('app').classList.contains('paused') @1000
 wait 400
 tap #resumeBtn
 until !document.getElementById('app').classList.contains('paused') @1000
+# ...and its buttons still act as buttons, not as pause
+wait 400
+tap #scaleHelpBtn
+until document.getElementById('scaleModal').classList.contains('show') @1000
+until !document.getElementById('app').classList.contains('paused') @1000
+tap #scaleModal
 
 # ---------- practice mode ----------
 click #pauseBtn
@@ -161,19 +171,18 @@ click #startArcadeBtn
 until document.getElementById('keyIntroOverlay').classList.contains('show') @3000
 wait 250
 shot 09-phone-landscape
-# landscape: canvas ends at 360, so 280-360 is the strip. Tap fires, drag steers.
+# landscape: the whole canvas steers and fires, top bar pauses
 until !document.getElementById('keyIntroOverlay').classList.contains('show') @8000
-tapxy 370 340
+tapxy 370 150
 wait 150
 until __si.bullets() > 0 @1000
 until !document.getElementById('app').classList.contains('paused') @1000
-drag 370 330 120 330 10 300
+drag 370 150 120 150 10 300
 until __si.targetX() !== null @1000
 until __si.targetX() === null @5000
 until Math.abs(__si.shipX() - 120) < 8 @1000
-# above the strip pauses even on the short layout
 wait 400
-tapxy 370 150
+tapxy 370 12
 wait 400
 until document.getElementById('app').classList.contains('paused') @1000
 
