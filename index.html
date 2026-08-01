@@ -631,8 +631,13 @@
     REL_MINOR[k] = tonic;                                       // major key -> its relative minor
   });
 
+  /* Practice mode opens on the three simplest keys of each tonality (0–1 accidentals).
+     The minors are deliberately the relative minors of those same three majors. */
+  const DEFAULT_PRACTICE = { major: ["C","G","F"], minor: ["A","E","D"] };
+
   // Active-tonality accessors (state.tonality is "major" | "minor").
   function activeOrder(){ return state.tonality === "minor" ? MINOR_ORDER : KEY_ORDER; }
+  function defaultPracticeKeys(){ return DEFAULT_PRACTICE[state.tonality].slice(); }
   function scaleFor(key){ return (state.tonality === "minor" ? MINOR_KEYS : KEYS)[key]; }
   function octavesFor(key){ return (state.tonality === "minor" ? MINOR_OCTAVES : SCALE_OCTAVES)[key]; }
   function sigFor(key){ return (state.tonality === "minor" ? MINOR_SIG : KEY_SIG)[key]; }
@@ -710,7 +715,7 @@
   const state = {
     mode: "arcade",           // "arcade" | "practice"
     tonality: "major",        // "major" | "minor" (global toggle)
-    practiceKeys: KEY_ORDER.slice(),
+    practiceKeys: DEFAULT_PRACTICE.major.slice(),
     score: 0, streak: 0, bestStreak: 0, lives: 3, level: 0,
     activeKey: null, keyRounds: 0, keyLockTarget: 10, lastIvIdx: null,  // stay in one key for a randomized run
     introTime: 0, introShown: 0,   // key-change countdown intro
@@ -812,7 +817,7 @@
   function setTonality(t){
     if(t === state.tonality) return;
     state.tonality = t;
-    state.practiceKeys = activeOrder().slice();   // select all keys of the new tonality
+    state.practiceKeys = defaultPracticeKeys();   // reset to the new tonality's starter keys
     previewKeyIdx = 0;
     buildKeyGrid();
     buildCheatSheet();
