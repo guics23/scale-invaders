@@ -1382,11 +1382,29 @@
        apart vertically (y = -40 - lane*46) and all fall at one speed, so lanes stay
        a permanent diagonal cascade and two labels are never side by side. The only
        clearance that matters is against this note's own head — hence the baseline
-       moved down with the font, keeping ~5px between cap top and the notehead. */
+       moved down with the font, keeping ~5px between cap top and the notehead.
+
+       An accidental is drawn as its own run rather than as one string: IBM Plex Mono
+       gives every glyph a 10.8px advance but lets the ink reach 11px, and its slanted
+       "#" carries no side bearing, so "A#" and "F#" come out with the hash crossing
+       the letter. ACC_GAP pulls them apart — set it to 0 to get the font's own
+       (colliding) spacing back. Flats never collided; they take the same gap so the
+       two label shapes stay consistent. */
+    const ACC_GAP = 2;
     ctx.font = "700 18px 'IBM Plex Mono', monospace";
     ctx.fillStyle = "#eab54c";
-    ctx.textAlign = "center";
-    ctx.fillText(o.note, o.x, o.y+26);
+    const acc = o.note.slice(1);
+    if(acc){
+      const letter = o.note[0];
+      ctx.textAlign = "left";
+      const wl = ctx.measureText(letter).width, wa = ctx.measureText(acc).width;
+      const x0 = o.x - (wl + ACC_GAP + wa)/2;
+      ctx.fillText(letter, x0, o.y+26);
+      ctx.fillText(acc, x0 + wl + ACC_GAP, o.y+26);
+    } else {
+      ctx.textAlign = "center";
+      ctx.fillText(o.note, o.x, o.y+26);
+    }
   }
 
   function draw(){
