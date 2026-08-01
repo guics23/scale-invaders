@@ -870,11 +870,22 @@
       g.lineTo(x0+width, y);
       g.stroke();
     }
-    // clef
+    /* clef \u2014 baseline derived from the glyph's ink box so it stays centred on the
+       staff whatever the font size or fallback face ends up being.
+       textAlign is set explicitly: this runs on two canvases, and the game one is
+       shared with drawNote. Inheriting "center" from there drew the clef and the key
+       signature half a glyph further left in-game than on the start screen. */
     g.fillStyle = "#eab54c";
     g.font = (ls*4.6) + "px serif";
     g.textBaseline = "alphabetic";
-    g.fillText("\uD834\uDD1E", x0 - ls*0.3, topY + ls*4 + ls*1.1);
+    g.textAlign = "left";
+    const clef = "\uD834\uDD1E";
+    const cm = g.measureText(clef);
+    const asc = cm.actualBoundingBoxAscent, desc = cm.actualBoundingBoxDescent;
+    const clefY = (asc && desc !== undefined)
+      ? topY + ls*2 + (asc - desc)/2          // centre the ink on the middle staff line
+      : topY + ls*4 + ls*1.1;                 // fallback if metrics are unavailable
+    g.fillText(clef, x0 - ls*0.3, clefY);
 
     // key signature (sig = {type, count})
     let sx = x0 + ls*3.4;
@@ -884,11 +895,25 @@
       const glyph = sig.type === "sharp" ? "\u266F" : "\u266D";
       g.font = (ls*1.9) + "px sans-serif";
       g.fillStyle = "#eab54c";
+      /* Which part of the glyph has to land on the staff position differs by glyph.
+         A sharp's ink is vertically symmetric, so its centre is the anchor. A flat's
+         pitch is the centre of its BOWL, and the bowl is only the bottom ~48% of the
+         ink \u2014 the stem rises above it \u2014 putting its centre about three quarters of the
+         way down. The single shared fudge factor this used to apply anchored both by
+         roughly the ink centre, which left every flat sitting 2-3px low at these
+         sizes. Ink is measured per draw so the anchor follows the font size, and both
+         canvases (start-screen preview and in-game) come through here. */
+      const anchorFrac = sig.type === "sharp" ? 0.5 : 0.754;
+      const gm = g.measureText(glyph);
+      const gAsc = gm.actualBoundingBoxAscent, gDesc = gm.actualBoundingBoxDescent;
+      const anchor = (gAsc && gDesc !== undefined)
+        ? -gAsc + (gAsc + gDesc)*anchorFrac   // anchor offset from the baseline
+        : -ls*0.55;                           // fallback if metrics are unavailable
       for(let i=0;i<sig.count;i++){
         const name = order[i];
         const pos = posMap[name];
         const y = topY + pos*half;
-        g.fillText(glyph, sx, y + ls*0.55);
+        g.fillText(glyph, sx, y - anchor);
         sx += ls*1.05;
       }
     }
