@@ -642,6 +642,32 @@
   function octavesFor(key){ return (state.tonality === "minor" ? MINOR_OCTAVES : SCALE_OCTAVES)[key]; }
   function sigFor(key){ return (state.tonality === "minor" ? MINOR_SIG : KEY_SIG)[key]; }
 
+  /* ---- Out-of-key notes ("intruders"), used as distractors on a repeat visit ----
+     Each of the 5 chromatic pitches outside a scale has exactly one sensible
+     spelling: the signature's own accidental where one exists — so a sharp key
+     never sprouts flats and vice versa — otherwise the plain letter. E#/B#/Cb/Fb
+     are excluded, which is precisely why the two cases never overlap and why the
+     palette is always 5 notes wide, even in B or Db where no accidental is left.
+     Naturals are written bare ("F" in G Major): the key signature is on screen to
+     read them against, so a ♮ would only add clutter. */
+  const SHARP_SPELLING   = {1:"C#", 3:"D#", 6:"F#", 8:"G#", 10:"A#"};  // E#, B# excluded
+  const FLAT_SPELLING    = {1:"Db", 3:"Eb", 6:"Gb", 8:"Ab", 10:"Bb"};  // Cb, Fb excluded
+  const NATURAL_SPELLING = {0:"C", 2:"D", 4:"E", 5:"F", 7:"G", 9:"A", 11:"B"};
+  function intrudersFor(key, scale, scaleOct){
+    const inKey = new Set(scale.map(noteSemitone));
+    // a signature-less key (C Major / A Minor) has no direction to match, so use sharps
+    const accMap = sigFor(key).type === "flat" ? FLAT_SPELLING : SHARP_SPELLING;
+    const out = [];
+    for(let p=0;p<12;p++){
+      if(inKey.has(p)) continue;
+      const note = accMap[p] || NATURAL_SPELLING[p];
+      // a diatonic scale spells all 7 letters exactly once, so the letter fixes the octave
+      const sameLetter = scaleOct.find(s => s.note[0] === note[0]);
+      out.push({note, octave: sameLetter.octave, isCorrect:false});
+    }
+    return out;
+  }
+
   function noteFrequency(note, octave){
     const midi = (octave + 1) * 12 + noteSemitone(note);
     return 440 * Math.pow(2, (midi - 69) / 12);
@@ -718,6 +744,7 @@
     practiceKeys: DEFAULT_PRACTICE.major.slice(),
     score: 0, streak: 0, bestStreak: 0, lives: 3, level: 0,
     activeKey: null, keyRounds: 0, keyLockTarget: 10, lastIvIdx: null,  // stay in one key for a randomized run
+    keyVisits: {},            // key -> how many times this game has switched INTO it; reset per game
     introTime: 0, introShown: 0,   // key-change countdown intro
     targetX: null,                 // touch drag destination; null when not dragging
     running: false, paused: false,
@@ -916,7 +943,9 @@
   function currentPool(){
     if(state.mode === "practice"){
       const keys = state.practiceKeys.length ? state.practiceKeys : [activeOrder()[0]];
-      return {keys, intervalIdx:[0,1,2,3,4,5], objects:4, speed:58};
+      // 5 objects, not 4: that is 4 distractors, which is what lets the repeat-visit
+      // intruder ramp reach its second stage while keeping half of them diatonic.
+      return {keys, intervalIdx:[0,1,2,3,4,5], objects:5, speed:58};
     }
     const lvl = LEVELS[state.level];
     // level pools are defined by major key; map to relative minor when in minor mode
@@ -986,6 +1015,12 @@
       state.keyRounds = 0;
       state.keyLockTarget = 8 + Math.floor(Math.random()*5);   // 8..12
       keyChanged = state.activeKey !== prev;
+      /* Tally what the player is actually shown, so a later difficulty ramp can ask
+         "have they seen this key before this game?". A run of 8-12 questions in one
+         key counts once: 1 = first appearance, >= 2 = a repeat. Gated on keyChanged
+         so a single-key practice pool (where candidates falls back to the current
+         key and nothing is re-announced) doesn't inflate the count. */
+      if(keyChanged) state.keyVisits[state.activeKey] = (state.keyVisits[state.activeKey] || 0) + 1;
     }
     const key = state.activeKey;
     state.keyRounds += 1;
@@ -1009,15 +1044,36 @@
 
     state.current = {key, interval, correctNote, correctOctave, correctIndex};
 
-    // build falling objects
+    /* Build falling objects. On a repeat visit to a key, some of the diatonic
+       distractors are swapped for out-of-key notes: 1 from the second visit, 2 from
+       the third on. They replace distractors rather than adding to the count — the
+       lanes are already tight on a phone, and the difficulty is meant to come from
+       the wrong answers being harder to reject, not from there being more of them.
+       At least half the distractors stay diatonic, so the question never degrades
+       into "spot the accidental". Intruders can only cost points: a wrong note that
+       lands is harmless, only the correct one falling past costs a life. */
     const numObjects = Math.min(pool.objects, 7);
-    const distractorIdx = shuffle(scale.map((_,i)=>i).filter(i=>i!==correctIndex)).slice(0, numObjects-1);
-    const allIdx = shuffle([correctIndex, ...distractorIdx]);
-    const n = allIdx.length;
-    state.objects = allIdx.map((idxInScale, lane) => ({
-      note: scale[idxInScale],
-      octave: scaleOct[idxInScale].octave,
-      isCorrect: idxInScale === correctIndex,
+    const numDistractors = numObjects - 1;
+    const visits = state.keyVisits[key] || 1;
+    const numIntruders = Math.min(visits - 1, 2, Math.floor(numDistractors/2));
+
+    const scaleDistractors = shuffle(scale.map((_,i)=>i).filter(i=>i!==correctIndex))
+      .slice(0, numDistractors - numIntruders)
+      .map(i => ({note: scale[i], octave: scaleOct[i].octave, isCorrect:false}));
+    const intruders = numIntruders > 0
+      ? shuffle(intrudersFor(key, scale, scaleOct)).slice(0, numIntruders)
+      : [];
+
+    const picks = shuffle([
+      {note: correctNote, octave: correctOctave, isCorrect: true},
+      ...scaleDistractors,
+      ...intruders
+    ]);
+    const n = picks.length;
+    state.objects = picks.map((p, lane) => ({
+      note: p.note,
+      octave: p.octave,
+      isCorrect: p.isCorrect,
       x: laneX(lane, n),
       y: -40 - lane*46,
       hit:false,
@@ -1521,6 +1577,7 @@
     state.mode = mode;
     state.score = 0; state.streak = 0; state.bestStreak = 0; state.lives = 3; state.level = 0;
     state.activeKey = null; state.keyRounds = 0; state.keyLockTarget = 0; state.lastIvIdx = null;
+    state.keyVisits = {};    // fresh game, fresh tally
     state.bullets = []; state.particles = []; state.objects = [];
     state.targetX = null;
     el.startScreen.style.display = "none";
@@ -1572,9 +1629,11 @@
       key(){ return state.activeKey; },
       tonality(){ return state.tonality; },
       rounds(){ return state.keyRounds; },
+      keyVisits(){ return Object.assign({}, state.keyVisits); },
       lockTarget(){ return state.keyLockTarget; },
       locked(){ return state.questionLock; },
       noteYs(){ return state.objects.filter(o => !o.hit).map(o => Math.round(o.y)); },
+      notes(){ return state.objects.filter(o => !o.hit).map(o => o.note + (o.isCorrect ? "*" : "")); },
       bullets(){ return state.bullets.length; },
       shipX(){ return Math.round(state.shipX); },
       targetX(){ return state.targetX === null ? null : Math.round(state.targetX); },

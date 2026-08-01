@@ -120,8 +120,16 @@ direct-invocation-style testing: the script is one big IIFE, so nothing else is
 reachable from outside, and there is no way to import a function in node.
 
 Read state: `si key`, `si tonality`, `si rounds`, `si lockTarget`, `si locked`,
-`si noteYs`, `si interval`, `si correctNote`, `si score`, `si streak`,
-`si lives`, `si running`, `si bullets`, `si shipX`, `si targetX`.
+`si noteYs`, `si notes`, `si keyVisits`, `si interval`, `si correctNote`,
+`si score`, `si streak`, `si lives`, `si running`, `si bullets`, `si shipX`,
+`si targetX`.
+
+`si notes` lists the unhit notes' labels with `*` marking the answer, e.g.
+`["B*","C","A","F"]` — the way to assert which distractors are on the board,
+including the out-of-key intruders that appear on a repeat visit to a key.
+`si keyVisits` is the per-game tally of how many times each key has been shown
+(`{"G":2}`); it drives the intruder ramp and resets on `startGame`. Both are
+worth combining: intruders are the labels in `si notes` that aren't in the key.
 
 `si bullets` is how you assert a shot happened; `si targetX` is the pending drag
 destination (`null` when idle), which is what proves a drag was speed-capped rather
