@@ -993,6 +993,27 @@
     return pad + (usable/(n-1||1))*i + (n===1 ? usable/2 : 0);
   }
 
+  /* Spawn formations — aesthetic only, one picked at random per question. Each gives
+     a depth per lane in 46px steps behind the leader, and depth is time: a note falls
+     its depth further before it lands. So every formation stays inside the cascade's
+     0..n-1 depth range, which pins the best and worst case, and the mean is kept close
+     to it (the diagonals are all permutations of the cascade, so their timing is
+     identical; the triangle shifts the mean by 0.4 steps, about 0.3s out of ~14s).
+     Adjacent lanes always differ by at least one step, which is what keeps two labels
+     from ever sitting side by side — see drawNote. The triangle needs a middle lane,
+     so it is 5-note only. */
+  function formationsFor(n){
+    const half = Math.ceil(n/2);
+    const list = [
+      Array.from({length:n}, (_,i) => i),          // one diagonal, leader on the left
+      Array.from({length:n}, (_,i) => n-1-i)       // the same diagonal mirrored, leader on the right
+    ];
+    if(n >= 4) list.push(Array.from({length:n},               // two parallel diagonals
+      (_,i) => i < half ? i*2 : (i - half)*2 + 1));
+    if(n === 5) list.push([4,2,0,2,4]);   // triangle pointing down — the middle note leads
+    return list;
+  }
+
   function ordinal(n){ return n + (["th","st","nd","rd"][(n%100>10&&n%100<14)?0:(n%10<4?n%10:0)]); }
 
   const SHIP_SPEED = 320;    // px/s — the cap for both arrow steering and touch drags
@@ -1095,12 +1116,14 @@
       ...intruders
     ]);
     const n = picks.length;
+    const forms = formationsFor(n);
+    const depth = forms[Math.floor(Math.random()*forms.length)];
     state.objects = picks.map((p, lane) => ({
       note: p.note,
       octave: p.octave,
       isCorrect: p.isCorrect,
       x: laneX(lane, n),
-      y: -40 - lane*46,
+      y: -40 - depth[lane]*46,
       hit:false,
       flash:0
     }));
@@ -1378,11 +1401,13 @@
     ctx.strokeStyle = "#f4eddc";
     ctx.lineWidth = 2;
     ctx.stroke();
-    /* Label. Bigger than it looks like it should be, and safe: notes spawn 46px
-       apart vertically (y = -40 - lane*46) and all fall at one speed, so lanes stay
-       a permanent diagonal cascade and two labels are never side by side. The only
-       clearance that matters is against this note's own head — hence the baseline
-       moved down with the font, keeping ~5px between cap top and the notehead.
+    /* Label. Bigger than it looks like it should be, and safe: every spawn formation
+       staggers adjacent lanes by at least 46px vertically and all notes fall at one
+       speed, so that gap is permanent and two labels are never side by side. (Only
+       lanes two or more apart ever share a height, and those are half the play area
+       apart.) The only clearance that matters is against this note's own head — hence
+       the baseline moved down with the font, keeping ~5px between cap top and the
+       notehead.
 
        An accidental is drawn as its own run rather than as one string: IBM Plex Mono
        gives every glyph a 10.8px advance but lets the ink reach 11px, and its slanted
