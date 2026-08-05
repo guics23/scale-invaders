@@ -542,21 +542,22 @@
     "Bb": ["Bb","C","D","Eb","F","G","A"],
     "Eb": ["Eb","F","G","Ab","Bb","C","D"],
     "Ab": ["Ab","Bb","C","Db","Eb","F","G"],
-    "Db": ["Db","Eb","F","Gb","Ab","Bb","C"]
+    "Db": ["Db","Eb","F","Gb","Ab","Bb","C"],
+    "Gb": ["Gb","Ab","Bb","Cb","Db","Eb","F"]
   };
-  const KEY_ORDER = ["C","G","D","A","E","B","F","Bb","Eb","Ab","Db"];
+  const KEY_ORDER = ["C","G","D","A","E","B","F","Bb","Eb","Ab","Db","Gb"];
 
   const KEY_SIG = {
     "C":{type:null,count:0}, "G":{type:"sharp",count:1}, "D":{type:"sharp",count:2},
     "A":{type:"sharp",count:3}, "E":{type:"sharp",count:4}, "B":{type:"sharp",count:5},
     "F":{type:"flat",count:1}, "Bb":{type:"flat",count:2}, "Eb":{type:"flat",count:3},
-    "Ab":{type:"flat",count:4}, "Db":{type:"flat",count:5}
+    "Ab":{type:"flat",count:4}, "Db":{type:"flat",count:5}, "Gb":{type:"flat",count:6}
   };
 
   const SHARP_ORDER = ["F#","C#","G#","D#","A#","E#"];
   const SHARP_POS   = {"F#":0, "C#":3, "G#":-1, "D#":2, "A#":5, "E#":1}; // half-line-steps from top staff line
-  const FLAT_ORDER  = ["Bb","Eb","Ab","Db","Gb"];
-  const FLAT_POS    = {"Bb":4, "Eb":1, "Ab":5, "Db":2, "Gb":6};
+  const FLAT_ORDER  = ["Bb","Eb","Ab","Db","Gb","Cb"];
+  const FLAT_POS    = {"Bb":4, "Eb":1, "Ab":5, "Db":2, "Gb":6, "Cb":3};
 
   const INTERVALS = [
     {deg:2, name:"Major 2nd"},
@@ -631,6 +632,20 @@
     REL_MINOR[k] = tonic;                                       // major key -> its relative minor
   });
 
+  /* ---- F# Major / D# minor: wired by hand, not looped in above ----
+     Same 6-accidental pitch set as Gb Major / Eb minor, just spelled with sharps.
+     Deliberately left out of KEY_ORDER/MINOR_ORDER (and so out of ARCADE_KEYS'
+     per-key grid math) — it only surfaces as the sharp-spelling twin of the last
+     entry in each list; see ENHARMONIC_TWIN. */
+  KEYS["F#"] = ["F#","G#","A#","B","C#","D#","E#"];
+  KEY_SIG["F#"] = {type:"sharp", count:6};
+  SCALE_OCTAVES["F#"] = buildScaleOctaves(KEYS["F#"]);
+  MINOR_KEYS["D#"] = KEYS["F#"].slice(5).concat(KEYS["F#"].slice(0,5));
+  MINOR_SIG["D#"] = KEY_SIG["F#"];
+  MINOR_OCTAVES["D#"] = buildScaleOctaves(MINOR_KEYS["D#"]);
+  REL_MINOR["F#"] = "D#";
+  const ENHARMONIC_TWIN = { major: {"Gb":"F#"}, minor: {"Eb":"D#"} };
+
   /* Practice mode opens on the three simplest keys of each tonality (0–1 accidentals).
      The minors are deliberately the relative minors of those same three majors. */
   const DEFAULT_PRACTICE = { major: ["C","G","F"], minor: ["A","E","D"] };
@@ -686,8 +701,8 @@
     {minScore:70,  keys:["F","G","D","Bb"],                          intervals:[1,2,3,4],       objects:4, speed:54},
     {minScore:180, keys:["F","G","D","Bb","A","Eb"],                 intervals:[0,1,2,3,4,5],   objects:4, speed:62},
     {minScore:320, keys:["F","G","D","Bb","A","Eb","E","Ab"],        intervals:[0,1,2,3,4,5],   objects:5, speed:72},
-    {minScore:500, keys:ARCADE_KEYS.slice(),                          intervals:[0,1,2,3,4,5],   objects:5, speed:84},
-    {minScore:720, keys:ARCADE_KEYS.slice(),                          intervals:[0,1,2,3,4,5],   objects:6, speed:98}
+    {minScore:500, keys:ARCADE_KEYS.concat(["F#"]),                   intervals:[0,1,2,3,4,5],   objects:5, speed:84},
+    {minScore:720, keys:ARCADE_KEYS.concat(["F#"]),                   intervals:[0,1,2,3,4,5],   objects:6, speed:98}
   ];
   /* Asymmetry on purpose: C Major is excluded from arcade, but its relative minor
      (A Minor) is not. An empty key signature makes C Major trivial because everyone
@@ -796,27 +811,35 @@
      ========================================================= */
   function buildKeyGrid(){
     el.keyGrid.innerHTML = "";
-    activeOrder().forEach(k => {
+    const order = activeOrder();
+    order.forEach((k, i) => {
+      // the last slot in each tonality is the 6-accidental key; fold its sharp-spelling
+      // twin (F# Major / D# minor) into the same chip instead of a 13th chip
+      const twin = (i === order.length - 1) ? ENHARMONIC_TWIN[state.tonality][k] : undefined;
+      const names = twin ? [k, twin] : [k];
       const chip = document.createElement("div");
-      chip.className = "chip" + (state.practiceKeys.includes(k) ? " active" : "");
-      chip.textContent = k;                 // tonic letter (mode is shown by the toggle)
+      chip.className = "chip" + (names.some(n => state.practiceKeys.includes(n)) ? " active" : "");
+      chip.textContent = twin ? (k + "/" + twin) : k;   // tonic letter (mode is shown by the toggle)
       chip.dataset.key = k;
       chip.tabIndex = 0;
-      chip.addEventListener("click", () => toggleKeyChip(chip, k));
-      chip.addEventListener("keydown", (e) => { if(e.key==="Enter"||e.key===" "){ e.preventDefault(); toggleKeyChip(chip,k);} });
+      chip.addEventListener("click", () => toggleKeyChip(chip, names));
+      chip.addEventListener("keydown", (e) => { if(e.key==="Enter"||e.key===" "){ e.preventDefault(); toggleKeyChip(chip,names);} });
       el.keyGrid.appendChild(chip);
     });
   }
-  function toggleKeyChip(chip, k){
+  function toggleKeyChip(chip, names){
     chip.classList.toggle("active");
     if(chip.classList.contains("active")){
-      if(!state.practiceKeys.includes(k)) state.practiceKeys.push(k);
+      names.forEach(n => { if(!state.practiceKeys.includes(n)) state.practiceKeys.push(n); });
     } else {
-      state.practiceKeys = state.practiceKeys.filter(x => x !== k);
+      state.practiceKeys = state.practiceKeys.filter(x => !names.includes(x));
     }
   }
   document.getElementById("selectAllKeys").addEventListener("click", () => {
-    state.practiceKeys = activeOrder().slice();
+    const order = activeOrder();
+    state.practiceKeys = order.slice();
+    const twin = ENHARMONIC_TWIN[state.tonality][order[order.length-1]];
+    if(twin) state.practiceKeys.push(twin);
     el.keyGrid.querySelectorAll(".chip").forEach(c => c.classList.add("active"));
   });
   document.getElementById("selectNoneKeys").addEventListener("click", () => {
